@@ -1,0 +1,26 @@
+{
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "panel": "lightsyesmenn:block/colored_light_panel",
+    "particle": "lightsyesmenn:block/colored_light_panel"
+  },
+  "elements": [
+    {
+      "from": [2, 4.01, 2],
+      "to": [14, 4.01, 14],
+      "shade": false,
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "up": {
+          "uv": [8.992, 9.992, 8.008, 9.008],
+          "texture": "#panel",
+          "tintindex": 0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "multipart": [
+    {
+      "when": { "facing": "north", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single" }
+    },
+    {
+      "when": { "facing": "north", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base" }
+    },
+    {
+      "when": { "facing": "north", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 180 }
+    },
+    {
+      "when": { "facing": "north", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid" }
+    },
+
+    {
+      "when": { "facing": "south", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single", "y": 180 }
+    },
+    {
+      "when": { "facing": "south", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 180 }
+    },
+    {
+      "when": { "facing": "south", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base" }
+    },
+    {
+      "when": { "facing": "south", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid", "y": 180 }
+    },
+
+    {
+      "when": { "facing": "east", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single", "y": 90 }
+    },
+    {
+      "when": { "facing": "east", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 90 }
+    },
+    {
+      "when": { "facing": "east", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 270 }
+    },
+    {
+      "when": { "facing": "east", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid", "y": 90 }
+    },
+
+    {
+      "when": { "facing": "west", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single", "y": 270 }
+    },
+    {
+      "when": { "facing": "west", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 270 }
+    },
+    {
+      "when": { "facing": "west", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "y": 90 }
+    },
+    {
+      "when": { "facing": "west", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid", "y": 270 }
+    },
+
+    {
+      "when": { "facing": "up", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single", "x": 90 }
+    },
+    {
+      "when": { "facing": "up", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "x": 270 }
+    },
+    {
+      "when": { "facing": "up", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "x": 90 }
+    },
+    {
+      "when": { "facing": "up", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid", "x": 90 }
+    },
+
+    {
+      "when": { "facing": "down", "north": "false", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_single", "x": 270 }
+    },
+    {
+      "when": { "facing": "down", "north": "false", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "x": 90 }
+    },
+    {
+      "when": { "facing": "down", "north": "true", "south": "false" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_base", "x": 270 }
+    },
+    {
+      "when": { "facing": "down", "north": "true", "south": "true" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_tube_mid", "x": 270 }
+    }
+  ]
+}

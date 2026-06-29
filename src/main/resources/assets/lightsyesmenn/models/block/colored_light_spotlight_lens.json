@@ -1,0 +1,23 @@
+{
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"textures": {
+		"1": "lightsyesmenn:block/colored_light_spotlight"
+	},
+	"elements": [
+		{
+			"name": "emitting_plane",
+			"from": [6.5, 6.5, 3.98],
+			"to": [9.5, 9.5, 3.98],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7, 7, 3.9]},
+			"faces": {
+				"north": {"uv": [0, 10, 1.5, 11.5], "texture": "#1", "tintindex": 0},
+				"east": {"uv": [10, 1, 10, 4], "texture": "#1"},
+				"south": {"uv": [10, 3.5, 10, 4.25], "texture": "#1"},
+				"west": {"uv": [10, 1, 10, 4], "texture": "#1"},
+				"up": {"uv": [10, 1, 10, 3.5], "texture": "#1"},
+				"down": {"uv": [10, 1, 10, 3], "texture": "#1"}
+			}
+		}
+	]
+}

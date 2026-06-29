@@ -1,0 +1,31 @@
+{
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "panel": "lightsyesmenn:block/colored_light_panel",
+    "particle": "lightsyesmenn:block/colored_light_panel"
+  },
+  "elements": [
+    {
+      "from": [2, 4.35, 2],
+      "to": [14, 4.35, 14],
+      "shade": false,
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "up": {
+          "uv": [3.992, 3.992, 1.008, 1.008],
+          "texture": "#panel",
+          "tintindex": 0
+        },
+        "down": {
+          "uv": [1.008, 3.992, 3.992, 1.008],
+          "texture": "#panel",
+          "tintindex": 0
+        }
+      }
+    }
+  ]
+}

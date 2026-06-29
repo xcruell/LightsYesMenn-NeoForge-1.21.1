@@ -1,0 +1,32 @@
+{
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"textures": {
+		"1": "lightsyesmenn:block/colored_light_spotlight"
+	},
+	"elements": [
+		{
+			"name": "base",
+			"from": [2, 0, 2],
+			"to": [14, 2, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7, 0, 6]},
+			"faces": {
+				"north": {"uv": [4, 10, 10, 11], "texture": "#1"},
+				"east": {"uv": [4, 10, 10, 11], "texture": "#1"},
+				"south": {"uv": [4, 10, 10, 11], "texture": "#1"},
+				"west": {"uv": [4, 10, 10, 11], "texture": "#1"},
+				"up": {"uv": [16, 16, 10, 10], "texture": "#1"},
+				"down": {"uv": [16, 10, 10, 16], "texture": "#1"}
+			}
+		}
+	],
+	"groups": [
+		{
+			"name": "main",
+			"origin": [8, 8, 8],
+			"scope": 0,
+			"color": 0,
+			"children": [0]
+		}
+	]
+}

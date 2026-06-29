@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "lightsyesmenn:colored_light",
+    "lightsyesmenn:colored_light_tube",
+    "lightsyesmenn:colored_light_panel",
+    "lightsyesmenn:colored_light_spotlight",
+    "lightsyesmenn:invisible_colored_light_spotlight"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "OR": [
+          { "powered": "false", "redstone_inverted": "false" },
+          { "powered": "true", "redstone_inverted": "true" }
+        ]
+      },
+      "apply": {
+        "model": "lightsyesmenn:block/colored_light_emissive"
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          { "powered": "true", "redstone_inverted": "false" },
+          { "powered": "false", "redstone_inverted": "true" }
+        ]
+      },
+      "apply": {
+        "model": "lightsyesmenn:block/colored_light"
+      }
+    }
+  ]
+}

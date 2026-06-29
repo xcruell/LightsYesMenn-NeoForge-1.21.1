@@ -1,0 +1,55 @@
+{
+  "textures": {
+    "1": "lightsyesmenn:block/colored_light_spotlight"
+  },
+  "elements": [
+    {
+      "from": [9, 7, 3.9],
+      "to": [9.5, 9, 3.9],
+      "shade": false,
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "north": {
+          "uv": [0, 10.25, 0.25, 11.25],
+          "texture": "#1"
+        }
+      }
+    },
+    {
+      "from": [6.5, 7, 3.9],
+      "to": [7, 9, 3.9],
+      "shade": false,
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "north": {
+          "uv": [1.25, 10.25, 1.5, 11.25],
+          "texture": "#1"
+        }
+      }
+    },
+    {
+      "from": [7, 6.5, 3.9],
+      "to": [9, 9.5, 3.9],
+      "shade": false,
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      },
+      "faces": {
+        "north": {
+          "uv": [0.25, 10, 1.25, 11.5],
+          "texture": "#1"
+        }
+      }
+    }
+  ]
+}

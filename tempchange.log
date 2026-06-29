@@ -1,0 +1,11 @@
+2026-06-29 WIP
+- Removed legacy yesmenn:* light ID/resource compatibility from L?YM while keeping shared YesMenn creative tab integration.
+- Fixed slider-drag GUI dim by removing extra black overlay.
+- Tint invisible spotlight marker with configured color and render it fullbright.
+- Switched panel active plane to emissive model and added NeoForge fullbright data to panel/tube emitters.
+- VILC test: reconstruct screen position from gl_FragCoord and disable first-person additive bubble pass.
+- GUI dim also redraws number fields at drag opacity.
+- Reverted vanilla/no-shader additive blend test because it overbrightened the scene.
+- Center number input values in the light GUI during normal rendering.
+- Wire colored light panel active plane to the fullbright model.
+- VILC binds a dummy complete 3D texture for uBlockGrid when voxel shadows are unavailable to avoid GL_INVALID_OPERATION program texture usage.

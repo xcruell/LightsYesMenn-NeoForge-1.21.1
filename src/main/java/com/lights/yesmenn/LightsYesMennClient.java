@@ -1,31 +1,45 @@
 package com.lights.yesmenn;
 
-import net.minecraft.client.Minecraft;
+import com.lights.yesmenn.client.ColoredLightRenderConfig;
+import com.lights.yesmenn.client.screen.ColoredLightsConfigScreen;
+import com.lights.yesmenn.compat.veil.ColoredLightClientCompat;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
 
-// This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = LightsYesMenn.MODID, dist = Dist.CLIENT)
-// You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
 @EventBusSubscriber(modid = LightsYesMenn.MODID, value = Dist.CLIENT)
 public class LightsYesMennClient {
     public LightsYesMennClient(ModContainer container) {
-        // Allows NeoForge to create a config screen for this mod's configs.
-        // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
-        // Do not forget to add translations for your config options to the en_us.json file.
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        container.registerExtensionPoint(IConfigScreenFactory.class, (modContainer, parent) -> new ColoredLightsConfigScreen(parent));
+        ColoredLightRenderConfig.load();
+        ColoredLightClientCompat.registerEventListeners();
     }
 
     @SubscribeEvent
-    static void onClientSetup(FMLClientSetupEvent event) {
-        // Some client setup code
-        LightsYesMenn.LOGGER.info("HELLO FROM CLIENT SETUP");
-        LightsYesMenn.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        ColoredLightClientCompat.registerRenderers(event);
+    }
+
+    @SubscribeEvent
+    static void onRegisterAdditionalModels(ModelEvent.RegisterAdditional event) {
+        ColoredLightClientCompat.registerAdditionalModels(event);
+    }
+
+    @SubscribeEvent
+    static void onRegisterBlockColors(RegisterColorHandlersEvent.Block event) {
+        ColoredLightClientCompat.registerBlockColors(event);
+    }
+
+    @SubscribeEvent
+    static void onRegisterItemColors(RegisterColorHandlersEvent.Item event) {
+        ColoredLightClientCompat.registerItemColors(event);
     }
 }

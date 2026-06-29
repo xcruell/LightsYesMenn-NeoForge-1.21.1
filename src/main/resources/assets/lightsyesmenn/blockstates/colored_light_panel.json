@@ -1,0 +1,112 @@
+{
+  "multipart": [
+    {
+      "when": { "facing": "up" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel" }
+    },
+    {
+      "when": { "facing": "down" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel", "x": 180 }
+    },
+    {
+      "when": { "facing": "north" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel", "x": 90 }
+    },
+    {
+      "when": { "facing": "south" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel", "x": 90, "y": 180 }
+    },
+    {
+      "when": { "facing": "west" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel", "x": 90, "y": 270 }
+    },
+    {
+      "when": { "facing": "east" },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel", "x": 90, "y": 90 }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "up" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright" }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "down" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright", "x": 180 }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "north" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright", "x": 90 }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "south" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright", "x": 90, "y": 180 }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "west" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright", "x": 90, "y": 270 }
+    },
+    {
+      "when": {
+        "AND": [
+          { "facing": "east" },
+          {
+            "OR": [
+              { "powered": "false", "redstone_inverted": "false" },
+              { "powered": "true", "redstone_inverted": "true" }
+            ]
+          }
+        ]
+      },
+      "apply": { "model": "lightsyesmenn:block/colored_light_panel_plane_fullbright", "x": 90, "y": 90 }
+    }
+  ]
+}

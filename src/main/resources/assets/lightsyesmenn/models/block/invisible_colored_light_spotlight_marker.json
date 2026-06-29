@@ -1,0 +1,19 @@
+{
+  "textures": {
+    "all": "minecraft:block/sea_lantern"
+  },
+  "elements": [
+    {
+      "from": [4, 4, 4],
+      "to": [12, 12, 12],
+      "faces": {
+        "down":  { "texture": "#all", "tintindex": 0 },
+        "up":    { "texture": "#all", "tintindex": 0 },
+        "north": { "texture": "#all", "tintindex": 0 },
+        "south": { "texture": "#all", "tintindex": 0 },
+        "west":  { "texture": "#all", "tintindex": 0 },
+        "east":  { "texture": "#all", "tintindex": 0 }
+      }
+    }
+  ]
+}
