@@ -1,0 +1,13 @@
+{
+  "itemGroup.lightsyesmenn": "Example Mod Tab",
+  "block.lightsyesmenn.example_block": "Example Block",
+  "item.lightsyesmenn.example_item": "Example Item",
+
+  "lightsyesmenn.configuration.title": "Lights? YesMenn! Configs",
+  "lightsyesmenn.configuration.section.lightsyesmenn.common.toml": "Lights? YesMenn! Configs",
+  "lightsyesmenn.configuration.section.lightsyesmenn.common.toml.title": "Lights? YesMenn! Configs",
+  "lightsyesmenn.configuration.items": "Item List",
+  "lightsyesmenn.configuration.logDirtBlock": "Log Dirt Block",
+  "lightsyesmenn.configuration.magicNumberIntroduction": "Magic Number Text",
+  "lightsyesmenn.configuration.magicNumber": "Magic Number"
+}
