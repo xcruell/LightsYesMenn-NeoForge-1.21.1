@@ -2,7 +2,7 @@
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
 	"textures": {
-		"1": "lightsyesmenn:block/colored_light_spotlight"
+		"1": "lightsyesmenn:block/colored_spotlight"
 	},
 	"elements": [
 		{

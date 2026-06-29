@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "powered=false,redstone_inverted=false": { "model": "lightsyesmenn:block/invisible_colored_pointlight" },
+    "powered=false,redstone_inverted=true": { "model": "lightsyesmenn:block/invisible_colored_pointlight" },
+    "powered=true,redstone_inverted=false": { "model": "lightsyesmenn:block/invisible_colored_pointlight" },
+    "powered=true,redstone_inverted=true": { "model": "lightsyesmenn:block/invisible_colored_pointlight" }
+  }
+}

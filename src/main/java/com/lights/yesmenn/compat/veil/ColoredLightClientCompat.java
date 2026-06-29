@@ -30,7 +30,11 @@ public final class ColoredLightClientCompat {
         event.register(ColoredLightSpotlightRenderer.YAW_MODEL);
         event.register(ColoredLightSpotlightRenderer.BODY_MODEL);
         event.register(ColoredLightSpotlightRenderer.LENS_MODEL);
-        event.register(ColoredLightSpotlightRenderer.INVISIBLE_MARKER_MODEL);
+        event.register(ColoredLightSpotlightRenderer.BIG_YAW_MODEL);
+        event.register(ColoredLightSpotlightRenderer.BIG_BODY_MODEL);
+        event.register(ColoredLightSpotlightRenderer.BIG_LENS_MODEL);
+        event.register(ColoredLightSpotlightRenderer.INVISIBLE_SPOTLIGHT_MODEL);
+        event.register(ColoredLightSpotlightRenderer.INVISIBLE_POINTLIGHT_MODEL);
     }
 
     public static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
@@ -45,7 +49,9 @@ public final class ColoredLightClientCompat {
                 ColoredLightCompatRegistry.COLORED_LIGHT_TUBE.get(),
                 ColoredLightCompatRegistry.COLORED_LIGHT_PANEL.get(),
                 ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT.get(),
-                ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get());
+                ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_BIG.get(),
+                ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get(),
+                ColoredLightCompatRegistry.INVISIBLE_COLORED_POINTLIGHT.get());
     }
 
     public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
@@ -60,6 +66,8 @@ public final class ColoredLightClientCompat {
                 ColoredLightCompatRegistry.COLORED_LIGHT_TUBE_ITEM.get(),
                 ColoredLightCompatRegistry.COLORED_LIGHT_PANEL_ITEM.get(),
                 ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_ITEM.get(),
-                ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT_ITEM.get());
+                ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_BIG_ITEM.get(),
+                ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT_ITEM.get(),
+                ColoredLightCompatRegistry.INVISIBLE_COLORED_POINTLIGHT_ITEM.get());
     }
 }

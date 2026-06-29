@@ -9,3 +9,9 @@
 - Center number input values in the light GUI during normal rendering.
 - Wire colored light panel active plane to the fullbright model.
 - VILC binds a dummy complete 3D texture for uBlockGrid when voxel shadows are unavailable to avoid GL_INVALID_OPERATION program texture usage.
+- VILC vanilla pass now uses RenderTarget viewWidth/viewHeight for viewport and texcoord normalization.
+- Add tint index to colored light panel fullbright plane.
+- VILC disables and restores GL scissor state around the fullscreen light pass to rule out clipped quadrant artifacts.
+- VILC samples depth with the actual depth texture size while keeping screen coordinates normalized to the visible view to avoid stale render-target quadrant reads.
+2026-06-29 WIP: Added big spotlight and invisible pointlight; renamed internal spotlight models/textures from colored_light_spotlight* to colored_spotlight*.
+2026-06-29 WIP: Replaced invisible marker model with separate invisible spotlight and pointlight models.

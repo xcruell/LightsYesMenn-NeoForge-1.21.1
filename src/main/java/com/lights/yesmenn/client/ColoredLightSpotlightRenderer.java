@@ -7,6 +7,7 @@ import com.lights.yesmenn.LightsYesMenn;
 import com.lights.yesmenn.block.ColoredLightBlock;
 import com.lights.yesmenn.block.ColoredLightSpotlightBlock;
 import com.lights.yesmenn.block.InvisibleColoredLightSpotlightBlock;
+import com.lights.yesmenn.block.InvisibleColoredPointLightBlock;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
 import com.lights.yesmenn.compat.veil.ColoredLightCompatRegistry;
 import net.minecraft.client.Minecraft;
@@ -19,22 +20,35 @@ import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<ColoredLightBlockEntity> {
-    public static final ModelResourceLocation INVISIBLE_MARKER_MODEL = new ModelResourceLocation(
-            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/invisible_colored_light_spotlight_marker"),
+    public static final ModelResourceLocation INVISIBLE_SPOTLIGHT_MODEL = new ModelResourceLocation(
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/invisible_colored_spotlight"),
+            ModelResourceLocation.STANDALONE_VARIANT);
+    public static final ModelResourceLocation INVISIBLE_POINTLIGHT_MODEL = new ModelResourceLocation(
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/invisible_colored_pointlight"),
             ModelResourceLocation.STANDALONE_VARIANT);
     public static final ModelResourceLocation YAW_MODEL = new ModelResourceLocation(
-            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_light_spotlight_yaw"),
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_yaw"),
             ModelResourceLocation.STANDALONE_VARIANT);
     public static final ModelResourceLocation BODY_MODEL = new ModelResourceLocation(
-            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_light_spotlight_body"),
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_body"),
             ModelResourceLocation.STANDALONE_VARIANT);
     public static final ModelResourceLocation LENS_MODEL = new ModelResourceLocation(
-            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_light_spotlight_lens"),
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_lens"),
+            ModelResourceLocation.STANDALONE_VARIANT);
+    public static final ModelResourceLocation BIG_YAW_MODEL = new ModelResourceLocation(
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_big_yaw"),
+            ModelResourceLocation.STANDALONE_VARIANT);
+    public static final ModelResourceLocation BIG_BODY_MODEL = new ModelResourceLocation(
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_big_body"),
+            ModelResourceLocation.STANDALONE_VARIANT);
+    public static final ModelResourceLocation BIG_LENS_MODEL = new ModelResourceLocation(
+            ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "block/colored_spotlight_big_lens"),
             ModelResourceLocation.STANDALONE_VARIANT);
     private static final float YAW_PIVOT_X = 8.0F / 16.0F;
     private static final float YAW_PIVOT_Y = 2.5F / 16.0F;
@@ -55,19 +69,26 @@ public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<Colore
             int packedLight,
             int packedOverlay) {
         BlockState state = blockEntity.getBlockState();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (state.getBlock() instanceof InvisibleColoredPointLightBlock) {
+            renderInvisibleModel(minecraft, blockEntity, state, poseStack, bufferSource, packedOverlay,
+                    ColoredLightCompatRegistry.INVISIBLE_COLORED_POINTLIGHT_ITEM.get(), INVISIBLE_POINTLIGHT_MODEL);
+            return;
+        }
         if (!(state.getBlock() instanceof ColoredLightSpotlightBlock)) {
             return;
         }
 
-        Minecraft minecraft = Minecraft.getInstance();
         if (state.getBlock() instanceof InvisibleColoredLightSpotlightBlock) {
-            renderInvisibleMarker(minecraft, blockEntity, state, poseStack, bufferSource, packedOverlay);
+            renderInvisibleModel(minecraft, blockEntity, state, poseStack, bufferSource, packedOverlay,
+                    ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT_ITEM.get(), INVISIBLE_SPOTLIGHT_MODEL);
             return;
         }
 
-        BakedModel yawModel = minecraft.getModelManager().getModel(YAW_MODEL);
-        BakedModel bodyModel = minecraft.getModelManager().getModel(BODY_MODEL);
-        BakedModel lensModel = minecraft.getModelManager().getModel(LENS_MODEL);
+        boolean big = state.is(ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_BIG.get());
+        BakedModel yawModel = minecraft.getModelManager().getModel(big ? BIG_YAW_MODEL : YAW_MODEL);
+        BakedModel bodyModel = minecraft.getModelManager().getModel(big ? BIG_BODY_MODEL : BODY_MODEL);
+        BakedModel lensModel = minecraft.getModelManager().getModel(big ? BIG_LENS_MODEL : LENS_MODEL);
         BakedModel missingModel = minecraft.getModelManager().getMissingModel();
         if (yawModel == missingModel || bodyModel == missingModel || lensModel == missingModel) {
             return;
@@ -88,15 +109,7 @@ public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<Colore
         poseStack.translate(-YAW_PIVOT_X, -YAW_PIVOT_Y, -YAW_PIVOT_Z);
 
         minecraft.getBlockRenderer().getModelRenderer().renderModel(
-                poseStack.last(),
-                consumer,
-                state,
-                yawModel,
-                1.0F,
-                1.0F,
-                1.0F,
-                packedLight,
-                packedOverlay);
+                poseStack.last(), consumer, state, yawModel, 1.0F, 1.0F, 1.0F, packedLight, packedOverlay);
 
         poseStack.translate(0.5F, 0.5F, 0.5F);
         applyInitialBeamPitchRotation(poseStack, facing, beamFacing);
@@ -107,27 +120,12 @@ public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<Colore
         poseStack.translate(-PITCH_PIVOT_X, -PITCH_PIVOT_Y, -PITCH_PIVOT_Z);
 
         minecraft.getBlockRenderer().getModelRenderer().renderModel(
-                poseStack.last(),
-                consumer,
-                state,
-                bodyModel,
-                1.0F,
-                1.0F,
-                1.0F,
-                packedLight,
-                packedOverlay);
+                poseStack.last(), consumer, state, bodyModel, 1.0F, 1.0F, 1.0F, packedLight, packedOverlay);
         if (ColoredLightBlock.isLightEnabled(state)) {
             float[] color = colorComponents(blockEntity.getColor());
             minecraft.getBlockRenderer().getModelRenderer().renderModel(
-                    poseStack.last(),
-                    consumer,
-                    state,
-                    lensModel,
-                    color[0],
-                    color[1],
-                    color[2],
-                    LightTexture.FULL_BRIGHT,
-                    packedOverlay);
+                    poseStack.last(), consumer, state, lensModel, color[0], color[1], color[2],
+                    LightTexture.FULL_BRIGHT, packedOverlay);
         }
         poseStack.popPose();
     }
@@ -152,34 +150,30 @@ public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<Colore
         }
     }
 
-    private static void renderInvisibleMarker(
+    private static void renderInvisibleModel(
             Minecraft minecraft,
             ColoredLightBlockEntity blockEntity,
             BlockState state,
             PoseStack poseStack,
             MultiBufferSource bufferSource,
-            int packedOverlay) {
+            int packedOverlay,
+            Item visibleItem,
+            ModelResourceLocation modelLocation) {
         if (minecraft.player == null
-                || !minecraft.player.getMainHandItem().is(ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT_ITEM.get())) {
+                || (!minecraft.player.getMainHandItem().is(visibleItem)
+                && !minecraft.player.getOffhandItem().is(visibleItem))) {
             return;
         }
 
-        BakedModel markerModel = minecraft.getModelManager().getModel(INVISIBLE_MARKER_MODEL);
-        if (markerModel == minecraft.getModelManager().getMissingModel()) {
+        BakedModel model = minecraft.getModelManager().getModel(modelLocation);
+        if (model == minecraft.getModelManager().getMissingModel()) {
             return;
         }
 
         float[] color = colorComponents(blockEntity.getColor());
         minecraft.getBlockRenderer().getModelRenderer().renderModel(
-                poseStack.last(),
-                bufferSource.getBuffer(Sheets.cutoutBlockSheet()),
-                state,
-                markerModel,
-                color[0],
-                color[1],
-                color[2],
-                LightTexture.FULL_BRIGHT,
-                packedOverlay);
+                poseStack.last(), bufferSource.getBuffer(Sheets.cutoutBlockSheet()), state, model,
+                color[0], color[1], color[2], LightTexture.FULL_BRIGHT, packedOverlay);
     }
 
     private static void applyInitialBeamYawRotation(PoseStack poseStack, Direction mountFace, Direction beamFacing) {

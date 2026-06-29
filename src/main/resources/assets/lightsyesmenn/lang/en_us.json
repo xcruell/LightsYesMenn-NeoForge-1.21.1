@@ -1,10 +1,12 @@
-﻿{
+{
   "itemGroup.lightsyesmenn": "YesMenn!",
   "block.lightsyesmenn.colored_light": "Colored Light",
   "block.lightsyesmenn.colored_light_tube": "Colored Light Tube",
   "block.lightsyesmenn.colored_light_panel": "Colored Light Panel",
   "block.lightsyesmenn.colored_light_spotlight": "Colored Light Spotlight",
+  "block.lightsyesmenn.colored_light_spotlight_big": "Big Colored Light Spotlight",
   "block.lightsyesmenn.invisible_colored_light_spotlight": "Invisible Colored Light Spotlight",
+  "block.lightsyesmenn.invisible_colored_pointlight": "Invisible Colored Pointlight",
   "item.lightsyesmenn.light_configurator": "Light Configurator",
   "screen.lightsyesmenn.colored_light": "Colored Light",
   "screen.lightsyesmenn.colored_lights_config": "Colored Lights",

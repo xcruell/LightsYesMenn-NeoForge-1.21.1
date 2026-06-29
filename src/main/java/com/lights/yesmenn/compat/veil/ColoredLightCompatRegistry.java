@@ -6,6 +6,7 @@ import com.lights.yesmenn.block.ColoredLightPanelBlock;
 import com.lights.yesmenn.block.ColoredLightSpotlightBlock;
 import com.lights.yesmenn.block.ColoredLightTubeBlock;
 import com.lights.yesmenn.block.InvisibleColoredLightSpotlightBlock;
+import com.lights.yesmenn.block.InvisibleColoredPointLightBlock;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
 import com.lights.yesmenn.item.ColoredLightTubeItem;
 import net.minecraft.core.registries.Registries;
@@ -74,6 +75,18 @@ public final class ColoredLightCompatRegistry {
             ITEMS.register("colored_light_spotlight",
                     () -> new BlockItem(COLORED_LIGHT_SPOTLIGHT.get(), new Item.Properties()));
 
+    public static final DeferredBlock<ColoredLightSpotlightBlock> COLORED_LIGHT_SPOTLIGHT_BIG =
+            BLOCKS.register("colored_light_spotlight_big",
+                    () -> new ColoredLightSpotlightBlock(
+                            BlockBehaviour.Properties.of()
+                                    .strength(1.5F, 6.0F)
+                                    .sound(SoundType.GLASS)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> COLORED_LIGHT_SPOTLIGHT_BIG_ITEM =
+            ITEMS.register("colored_light_spotlight_big",
+                    () -> new BlockItem(COLORED_LIGHT_SPOTLIGHT_BIG.get(), new Item.Properties()));
+
     public static final DeferredBlock<InvisibleColoredLightSpotlightBlock> INVISIBLE_COLORED_LIGHT_SPOTLIGHT =
             BLOCKS.register("invisible_colored_light_spotlight",
                     () -> new InvisibleColoredLightSpotlightBlock(
@@ -86,6 +99,18 @@ public final class ColoredLightCompatRegistry {
             ITEMS.register("invisible_colored_light_spotlight",
                     () -> new BlockItem(INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get(), new Item.Properties()));
 
+    public static final DeferredBlock<InvisibleColoredPointLightBlock> INVISIBLE_COLORED_POINTLIGHT =
+            BLOCKS.register("invisible_colored_pointlight",
+                    () -> new InvisibleColoredPointLightBlock(
+                            BlockBehaviour.Properties.of()
+                                    .strength(1.5F, 6.0F)
+                                    .sound(SoundType.GLASS)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> INVISIBLE_COLORED_POINTLIGHT_ITEM =
+            ITEMS.register("invisible_colored_pointlight",
+                    () -> new BlockItem(INVISIBLE_COLORED_POINTLIGHT.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ColoredLightBlockEntity>> COLORED_LIGHT_ENTITY =
             BLOCK_ENTITY_TYPES.register("colored_light",
                     () -> BlockEntityType.Builder.of(
@@ -94,7 +119,9 @@ public final class ColoredLightCompatRegistry {
                             COLORED_LIGHT_TUBE.get(),
                             COLORED_LIGHT_PANEL.get(),
                             COLORED_LIGHT_SPOTLIGHT.get(),
-                            INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get()
+                            COLORED_LIGHT_SPOTLIGHT_BIG.get(),
+                            INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get(),
+                            INVISIBLE_COLORED_POINTLIGHT.get()
                     ).build(null));
 
     private ColoredLightCompatRegistry() {

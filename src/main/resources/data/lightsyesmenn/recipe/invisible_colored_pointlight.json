@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " G ",
+    "ESE",
+    " G "
+  ],
+  "key": {
+    "E": { "item": "minecraft:ender_pearl" },
+    "G": { "item": "minecraft:glass" },
+    "S": { "item": "lightsyesmenn:colored_light" }
+  },
+  "result": {
+    "id": "lightsyesmenn:invisible_colored_pointlight",
+    "count": 1
+  }
+}

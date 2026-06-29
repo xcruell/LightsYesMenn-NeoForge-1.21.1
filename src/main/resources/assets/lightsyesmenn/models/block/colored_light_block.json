@@ -1,6 +1,7 @@
 {
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
+	"render_type": "minecraft:translucent",
 	"textures": {
 		"1": "lightsyesmenn:block/andesite_glass",
 		"2": "lightsyesmenn:block/light_small",

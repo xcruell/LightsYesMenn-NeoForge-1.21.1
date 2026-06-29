@@ -16,7 +16,8 @@
       "faces": {
         "up": {
           "uv": [8.992, 9.992, 8.008, 9.008],
-          "texture": "#panel"
+          "texture": "#panel",
+          "tintindex": 0
         }
       }
     }

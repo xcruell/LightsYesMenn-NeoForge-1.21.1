@@ -45,7 +45,9 @@ public final class ModCreativeModeTabs {
         output.accept(ColoredLightCompatRegistry.COLORED_LIGHT_TUBE_ITEM.get());
         output.accept(ColoredLightCompatRegistry.COLORED_LIGHT_PANEL_ITEM.get());
         output.accept(ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_ITEM.get());
+        output.accept(ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_BIG_ITEM.get());
         output.accept(ColoredLightCompatRegistry.INVISIBLE_COLORED_LIGHT_SPOTLIGHT_ITEM.get());
+        output.accept(ColoredLightCompatRegistry.INVISIBLE_COLORED_POINTLIGHT_ITEM.get());
         output.accept(ModItems.LIGHT_CONFIGURATOR.get());
     }
 }
