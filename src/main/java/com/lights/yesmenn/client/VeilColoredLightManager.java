@@ -21,6 +21,9 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -59,7 +62,7 @@ public final class VeilColoredLightManager {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
             renderPartialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
             try {
-                updateAll();
+                updateMoving();
             } finally {
                 renderPartialTick = null;
             }
@@ -86,6 +89,20 @@ public final class VeilColoredLightManager {
         }
     }
 
+    // Static lights are refreshed on the client tick; only lights on moving Sable sublevels need per-frame updates.
+    private static void updateMoving() {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (level == null) {
+            return;
+        }
+        for (Map.Entry<ColoredLightBlockEntity, ManagedLight> entry : LIGHTS.entrySet()) {
+            ColoredLightBlockEntity blockEntity = entry.getKey();
+            if (entry.getValue().sableTransformActive && !blockEntity.isRemoved() && blockEntity.getLevel() == level) {
+                entry.getValue().update(blockEntity);
+            }
+        }
+    }
+
     public static void onClientLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         clear();
     }
@@ -105,7 +122,6 @@ public final class VeilColoredLightManager {
         private LightRenderHandle<AreaLightData> areaHandle;
         private int color = -1;
         private int radius = -1;
-        private boolean enabled;
         private Vec3 position;
         private Direction facing;
         private Direction beamFacing;
@@ -156,11 +172,15 @@ public final class VeilColoredLightManager {
             Vec3 nextPosition = nextAreaTransform != null ? nextAreaTransform.position() : blockCenter;
             Vec3 nextForward = nextAreaTransform != null ? nextAreaTransform.forward() : null;
             Quaternionf nextOrientation = nextAreaTransform != null ? nextAreaTransform.orientation() : null;
+            if (!nextEnabled) {
+                // Disabled lights are removed from Veil entirely instead of being kept at zero brightness.
+                if (pointHandle != null || areaHandle != null) {
+                    free();
+                }
+                return;
+            }
             if (!isValid(nextMode)) {
                 free();
-                if (!nextEnabled) {
-                    return;
-                }
                 if (nextMode == Mode.PANEL || nextMode == Mode.SPOTLIGHT) {
                     createAreaLight(blockEntity, nextPosition, nextOrientation, nextMode);
                 } else {
@@ -169,7 +189,6 @@ public final class VeilColoredLightManager {
                 color = blockEntity.getColor();
                 radius = blockEntity.getRadius();
                 spotlightBrightness = blockEntity.getBrightness();
-                enabled = true;
                 position = nextPosition;
                 forward = nextForward;
                 facing = nextFacing;
@@ -211,7 +230,6 @@ public final class VeilColoredLightManager {
             boolean brightnessChanged = nextLightBrightness != spotlightBrightness;
             if (nextColor == color
                     && nextRadius == radius
-                    && nextEnabled == enabled
                     && !positionChanged
                     && !forwardChanged
                     && !facingChanged
@@ -242,10 +260,7 @@ public final class VeilColoredLightManager {
                                 nextColorValues[1],
                                 nextColorValues[2])
                         .setDistance(nextRadius)
-                        .setBrightness(nextEnabled
-                                ? brightnessMultiplier(nextLightBrightness)
-                                * exposure(renderConfig)
-                                : 0.0F);
+                        .setBrightness(brightnessMultiplier(nextLightBrightness) * exposure(renderConfig));
                 if (spotlightSettingsChanged && !facingChanged && !beamFacingChanged && !forwardChanged) {
                     data.getOrientation().set(nextOrientation);
                 }
@@ -264,12 +279,11 @@ public final class VeilColoredLightManager {
                                 nextColorValues[1],
                                 nextColorValues[2])
                         .setRadius(nextRadius)
-                        .setBrightness(nextEnabled ? brightnessMultiplier(nextLightBrightness) * exposure(renderConfig) : 0.0F);
+                        .setBrightness(brightnessMultiplier(nextLightBrightness) * exposure(renderConfig));
                 pointHandle.markDirty();
             }
             color = nextColor;
             radius = nextRadius;
-            enabled = nextEnabled;
             position = nextPosition;
             forward = nextForward;
             facing = nextFacing;
@@ -348,20 +362,25 @@ public final class VeilColoredLightManager {
         }
 
         private static void setAreaShape(AreaLightData data, int softness, int focus) {
-            try {
-                Class<?> registry = Class.forName("com.yesmenn.veilirislights.compat.light.AreaLightShapeRegistry");
-                registry.getMethod("set", AreaLightData.class, float.class, float.class)
-                        .invoke(null, data, softness / 100.0F, focus / 100.0F);
-            } catch (ReflectiveOperationException ignored) {
+            MethodHandle set = AreaShapeBridge.SET;
+            if (set == null) {
                 // VILC is optional; plain Veil ignores the extra beam-shape controls.
+                return;
+            }
+            try {
+                set.invokeExact(data, softness / 100.0F, focus / 100.0F);
+            } catch (Throwable ignored) {
             }
         }
 
         private static void clearAreaShape(AreaLightData data) {
+            MethodHandle clear = AreaShapeBridge.CLEAR;
+            if (clear == null) {
+                return;
+            }
             try {
-                Class<?> registry = Class.forName("com.yesmenn.veilirislights.compat.light.AreaLightShapeRegistry");
-                registry.getMethod("clear", AreaLightData.class).invoke(null, data);
-            } catch (ReflectiveOperationException ignored) {
+                clear.invokeExact(data);
+            } catch (Throwable ignored) {
             }
         }
 
@@ -537,10 +556,9 @@ public final class VeilColoredLightManager {
             };
         }
 
+        // L?YM!'s color settings tune its own lamps and stack with VILC's global light-pass settings.
+        // Defaults are neutral, so lamps look the same until the player changes them.
         private static ColoredLightRenderConfig activeRenderConfig() {
-            if (OptionalModCompat.vilcAvailable()) {
-                return null;
-            }
             ColoredLightRenderConfig renderConfig = ColoredLightRenderConfig.get();
             renderConfig.clamp();
             return renderConfig;
@@ -579,7 +597,6 @@ public final class VeilColoredLightManager {
             }
             pointHandle = null;
             areaHandle = null;
-            enabled = false;
             position = null;
             facing = null;
             beamFacing = null;
@@ -605,6 +622,25 @@ public final class VeilColoredLightManager {
             POINT,
             PANEL,
             SPOTLIGHT
+        }
+
+        private static final class AreaShapeBridge {
+            private static final MethodHandle SET = find("set",
+                    MethodType.methodType(void.class, AreaLightData.class, float.class, float.class));
+            private static final MethodHandle CLEAR = find("clear",
+                    MethodType.methodType(void.class, AreaLightData.class));
+
+            private static MethodHandle find(String name, MethodType type) {
+                if (!OptionalModCompat.vilcAvailable()) {
+                    return null;
+                }
+                try {
+                    Class<?> registry = Class.forName("com.yesmenn.veilirislights.compat.light.AreaLightShapeRegistry");
+                    return MethodHandles.publicLookup().findStatic(registry, name, type);
+                } catch (ReflectiveOperationException | LinkageError ignored) {
+                    return null;
+                }
+            }
         }
 
         private record AreaTransform(Vec3 position, Vec3 forward, Quaternionf orientation) {

@@ -130,7 +130,7 @@ configurations {
 }
 
 dependencies {
-    implementation "maven.modrinth:3KUWeVhG:S2FKHf1q" //Veil 4.2.1
+    implementation "maven.modrinth:3KUWeVhG:IpGnlNgK" //Veil 4.5.2
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
@@ -177,6 +177,13 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
+
+// Ship the license with the mod jar.
+tasks.named('processResources', ProcessResources).configure {
+    from('LICENSE') {
+        into 'META-INF'
+    }
+}
 
 // Example configuration to allow publishing using the maven-publish plugin
 publishing {

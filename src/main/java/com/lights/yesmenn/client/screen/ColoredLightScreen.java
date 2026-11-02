@@ -74,6 +74,9 @@ public class ColoredLightScreen extends Screen {
     private boolean selectingCustomPreset;
     private boolean syncing;
     private boolean suppressLightPreview;
+    private static final long LIGHT_SYNC_INTERVAL_MILLIS = 100L;
+    private boolean pendingLightSync;
+    private long lastLightSyncMillis;
     private int colorDragMode;
     private boolean sliderDragging;
     private EditBox radiusBox;
@@ -479,15 +482,36 @@ public class ColoredLightScreen extends Screen {
             light.setBrightness(brightness);
         }
         if (sendToServer) {
-            PacketDistributor.sendToServer(new ColoredLightActionPayload(
-                    pos,
-                    ColoredLightActionPayload.SET_CONFIG,
-                    ColoredLightActionPayload.packConfig(radius, color, redstoneInverted)));
-            PacketDistributor.sendToServer(new ColoredLightActionPayload(
-                    pos,
-                    ColoredLightActionPayload.SET_BRIGHTNESS,
-                    brightness));
+            // The client block entity already previews the change; the server only needs a throttled copy.
+            pendingLightSync = true;
+            flushLightSync(false);
         }
+    }
+
+    private void flushLightSync(boolean force) {
+        if (!pendingLightSync) {
+            return;
+        }
+        long now = Util.getMillis();
+        if (!force && now - lastLightSyncMillis < LIGHT_SYNC_INTERVAL_MILLIS) {
+            return;
+        }
+        pendingLightSync = false;
+        lastLightSyncMillis = now;
+        PacketDistributor.sendToServer(new ColoredLightActionPayload(
+                pos,
+                ColoredLightActionPayload.SET_CONFIG,
+                ColoredLightActionPayload.packConfig(radius, red << 16 | green << 8 | blue, redstoneInverted)));
+        PacketDistributor.sendToServer(new ColoredLightActionPayload(
+                pos,
+                ColoredLightActionPayload.SET_BRIGHTNESS,
+                brightness));
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        flushLightSync(false);
     }
 
     private void previewSpotlightSettings() {
@@ -954,6 +978,7 @@ public class ColoredLightScreen extends Screen {
 
     @Override
     public void onClose() {
+        flushLightSync(true);
         saveChanges();
         super.onClose();
     }

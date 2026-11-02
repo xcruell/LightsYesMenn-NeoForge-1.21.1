@@ -2,6 +2,7 @@ package com.lights.yesmenn.block;
 
 import com.mojang.serialization.MapCodec;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
+import com.lights.yesmenn.compat.veil.ColoredLightCompatRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,6 +25,9 @@ public class ColoredLightSpotlightBlock extends ColoredLightBlock {
     public static final MapCodec<ColoredLightSpotlightBlock> CODEC = simpleCodec(ColoredLightSpotlightBlock::new);
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
     public static final DirectionProperty BEAM_FACING = DirectionProperty.create("beam_facing");
+    private static final VoxelShape BIG_UP_DOWN_SHAPE = box(1, 0, 1, 15, 16, 15);
+    private static final VoxelShape BIG_NORTH_SOUTH_SHAPE = box(1, 1, 0, 15, 15, 16);
+    private static final VoxelShape BIG_EAST_WEST_SHAPE = box(0, 1, 1, 16, 15, 15);
 
     public ColoredLightSpotlightBlock(Properties properties) {
         super(properties);
@@ -51,6 +55,13 @@ public class ColoredLightSpotlightBlock extends ColoredLightBlock {
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        if (state.is(ColoredLightCompatRegistry.COLORED_LIGHT_SPOTLIGHT_BIG.get())) {
+            return switch (state.getValue(FACING)) {
+                case UP, DOWN -> BIG_UP_DOWN_SHAPE;
+                case NORTH, SOUTH -> BIG_NORTH_SOUTH_SHAPE;
+                case WEST, EAST -> BIG_EAST_WEST_SHAPE;
+            };
+        }
         return switch (state.getValue(FACING)) {
             case UP -> box(4, 0, 4, 12, 10, 12);
             case DOWN -> box(4, 6, 4, 12, 16, 12);

@@ -18,7 +18,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public class InvisibleColoredPointLightBlock extends ColoredLightBlock {
     public static final MapCodec<InvisibleColoredPointLightBlock> CODEC =
             simpleCodec(InvisibleColoredPointLightBlock::new);
-    private static final VoxelShape SHAPE = box(5, 5, 5, 11, 11, 11);
+    private static final VoxelShape SHAPE = box(2, 2, 2, 14, 14, 14);
 
     public InvisibleColoredPointLightBlock(Properties properties) {
         super(properties);

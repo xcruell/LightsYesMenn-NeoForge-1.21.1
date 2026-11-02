@@ -44,12 +44,6 @@ public final class FakeColoredLightManager {
         }
     }
 
-    public static void markDirty(ServerLevel level) {
-    }
-
-    public static void markDirty(ServerLevel level, BlockPos changedPos) {
-    }
-
     public static synchronized boolean preventsMonsterSpawn(ServerLevel level, BlockPos pos) {
         LevelData data = LEVELS.get(level);
         if (data == null || data.lights.isEmpty()) {
@@ -62,7 +56,8 @@ public final class FakeColoredLightManager {
         int maxChunkZ = (pos.getZ() + MAX_RADIUS) >> 4;
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                LongOpenHashSet chunkLights = data.lightChunks.get(ChunkPos.asLong(chunkX, chunkZ));
+                long chunkKey = ChunkPos.asLong(chunkX, chunkZ);
+                LongOpenHashSet chunkLights = data.lightChunks.get(chunkKey);
                 if (chunkLights == null || chunkLights.isEmpty()) {
                     continue;
                 }
@@ -74,6 +69,10 @@ public final class FakeColoredLightManager {
                     if (light == null || light.isRemoved()) {
                         iterator.remove();
                         data.lights.remove(packedLightPos);
+                        if (chunkLights.isEmpty()) {
+                            data.lightChunks.remove(chunkKey);
+                            break;
+                        }
                         continue;
                     }
                     if (!ColoredLightBlock.isLightEnabled(light.getBlockState())) {

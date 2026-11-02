@@ -15,3 +15,32 @@
 - VILC samples depth with the actual depth texture size while keeping screen coordinates normalized to the visible view to avoid stale render-target quadrant reads.
 2026-06-29 WIP: Added big spotlight and invisible pointlight; renamed internal spotlight models/textures from colored_light_spotlight* to colored_spotlight*.
 2026-06-29 WIP: Replaced invisible marker model with separate invisible spotlight and pointlight models.
+2026-07-02 - VILC/L?YM vanilla quadrant debugging
+- Status: Quadranten weiterhin sichtbar bei Iris Shaderpack OFF; Shaderpack ON blendet sie aus, aber Lichtpfad ist dort aktuell separat kaputt/nachrangig.
+- Ausgeschlossen: Light resolve/compositeFramebuffer als alleinige Ursache. Direct composite von lightTexture statt resolvedLightTexture hat Quadranten nicht entfernt.
+- Beobachtung: GL_INVALID_OPERATION "program texture usage" spammt weiter, daher Verdacht auf Feedback/invalid texture attachment during composite.
+- Naechster Versuch: Vanilla composite ohne GL_DST_COLOR Destination-Blend. Scene-Farbe zuerst in separate Texture kopieren, dann Scene+Light in Shader berechnen und ohne Blend zurueck in Main-FBO schreiben.
+2026-07-02 - Versuch: Vanilla composite ohne Destination-Blend
+- Geaendert in VILC IrisVeilLightPass: Vanilla-Pfad kopiert die bestehende Scene zuerst in resolvedLightTexture.
+- Danach schreibt der Composite-Shader Scene * (1 + Light) ohne GL_BLEND in das Main-FBO zurueck.
+- Non-vanilla/Iris-Pfad bleibt auf altem Light-only Shader + GL_DST_COLOR Blend, damit dieser Test gezielt den Shaderpack-OFF/Vanilla-Pfad isoliert.
+- Build: VILC compileJava + assemble erfolgreich; Jar nach L?YM run/mods kopiert.
+- Testziel: Wenn Quadranten/GL_INVALID_OPERATION verschwinden, war der Vanilla-Destination-Blend/Main-FBO-Composite die Ursache. Wenn nicht, liegt der Fehler frueher im LightTexture-Inhalt oder in externer FBO/Texture-State-Kopplung.
+2026-07-02 - Testfeedback Scene-copy Composite
+- Screenshot 13:31 zeigt Fortschritt: Scene/Farben anderer Lights kommen durch die Quadranten durch, der Effekt ist nicht mehr komplett als hartes Overlay davor.
+- Schluss: Composite/Main-FBO-Feedback war mindestens Teil des Problems, aber die Quadranten sind noch im Light-Anteil vorhanden.
+- Naechster Fokus: LightTexture-Erzeugung selbst pruefen, besonders Depth-Sampling/Depth-UV/Viewport und ob bei vanilla der falsche Depth-Buffer bzw. falsche Depth-Aufloesung rekonstruiert wird.
+2026-11-02 - Veil 4.5.2 + cleanup/perf pass
+- Updated Veil dependency to 4.5.2 (modrinth version IpGnlNgK), minimum versionRange [4.5.2,).
+- Magenta checkerboard/hand with Iris was Veil's own light pass sampling a missing albedo buffer (Veil disables dynamic buffers whenever Iris is loaded); fixed in VILC (MixinVeilNativeLightPass). Without Iris L?YM! uses plain Veil unchanged.
+- Light manager: only lights on moving Sable sublevels update per frame; static lights update on client tick.
+- Disabled (redstone-off) lights are freed from Veil instead of kept at brightness 0.
+- VILC area-shape bridge, VILC shader-pass check and block-entity client hooks resolve their method handles once instead of reflecting on every call; mod-loaded checks are cached.
+- Block tint chunk rebuild only runs when the color actually changes, not on every block-entity update.
+- Light GUI sends server updates throttled to 10/s (always flushed on close) instead of 2 packets per slider step.
+- Server rejects light edits from players who may not build there (adventure mode, spawn protection, unloaded chunk).
+- Spawn protection index drops empty chunk entries; removed unused markDirty stubs.
+- L?YM! color settings (exposure/strength/saturation/neutral) now always apply to its lamps, also with VILC installed (previously ignored whenever VILC was loaded). Defaults are neutral.
+- Config screens: L?YM! alone -> L?YM! screen; VILC alone -> VILC screen; both -> combined "Lights? YesMenn! + VILC" screen from every entry point (both mod-list entries and VILC's O key) via ConfigScreenBridge.registerCombinedScreen. Removed unused openFromVilc.
+- License changed to CC BY-NC-SA 4.0 (LICENSE file with summary + full legal code, bundled into the jar as META-INF/LICENSE; mod_license=CC-BY-NC-SA-4.0).
+- License switched from CC BY-NC-SA 4.0 to the YesMenn Custom License 1.0 (same LICENSE as VILC; bundled as META-INF/LICENSE).

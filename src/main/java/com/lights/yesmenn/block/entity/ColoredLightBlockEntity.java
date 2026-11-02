@@ -19,7 +19,9 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.InvocationTargetException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 
 public class ColoredLightBlockEntity extends BlockEntity {
     public static final int DEFAULT_COLOR = 0xFFFFFF;
@@ -224,6 +226,7 @@ public class ColoredLightBlockEntity extends BlockEntity {
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
+        int previousColor = color;
         color = tag.contains("Color") ? tag.getInt("Color") & 0xFFFFFF : DEFAULT_COLOR;
         spotlightAngle = tag.contains("SpotlightAngle") ? tag.getInt("SpotlightAngle") : DEFAULT_SPOTLIGHT_ANGLE;
         spotlightBrightness = tag.contains("SpotlightBrightness")
@@ -241,7 +244,10 @@ public class ColoredLightBlockEntity extends BlockEntity {
                 ? tag.getInt("SpotlightSoftness")
                 : DEFAULT_SPOTLIGHT_SOFTNESS;
         spotlightFocus = tag.contains("SpotlightFocus") ? tag.getInt("SpotlightFocus") : DEFAULT_SPOTLIGHT_FOCUS;
-        invokeClientRenderHook();
+        if (color != previousColor) {
+            // Only a color change affects the baked block tint; other updates must not rebuild the chunk section.
+            invokeClientRenderHook();
+        }
     }
 
     @Override
@@ -272,7 +278,6 @@ public class ColoredLightBlockEntity extends BlockEntity {
     private void markUpdated() {
         setChanged();
         if (level instanceof ServerLevel serverLevel) {
-            FakeColoredLightManager.markDirty(serverLevel);
             serverLevel.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
     }
@@ -281,27 +286,48 @@ public class ColoredLightBlockEntity extends BlockEntity {
         if (level == null || !level.isClientSide || !OptionalModCompat.coloredLightAvailable()) {
             return;
         }
+        MethodHandle hook = "register".equals(method) ? ClientHooks.REGISTER_LIGHT : ClientHooks.UNREGISTER_LIGHT;
+        if (hook == null) {
+            return;
+        }
         try {
-            Class<?> manager = Class.forName("com.lights.yesmenn.client.VeilColoredLightManager");
-            manager.getMethod(method, ColoredLightBlockEntity.class).invoke(null, this);
-        } catch (ClassNotFoundException ignored) {
-            // Dedicated servers never load the client manager.
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
+            hook.invokeExact(this);
+        } catch (Throwable exception) {
             throw new IllegalStateException("Could not update Veil colored light.", exception);
         }
     }
 
     private void invokeClientRenderHook() {
-        if (level == null || !level.isClientSide) {
+        if (level == null || !level.isClientSide || ClientHooks.REFRESH_TINT == null) {
             return;
         }
         try {
-            Class<?> hooks = Class.forName("com.lights.yesmenn.client.ColoredLightClientHooks");
-            hooks.getMethod("refreshBlockTint", BlockPos.class).invoke(null, worldPosition);
-        } catch (ClassNotFoundException ignored) {
-            // Dedicated servers never load the client hooks.
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
+            ClientHooks.REFRESH_TINT.invokeExact(worldPosition);
+        } catch (Throwable exception) {
             throw new IllegalStateException("Could not refresh colored light block tint.", exception);
+        }
+    }
+
+    // Resolved once on first client use; dedicated servers never touch this holder.
+    private static final class ClientHooks {
+        private static final MethodHandle REGISTER_LIGHT = find(
+                "com.lights.yesmenn.client.VeilColoredLightManager", "register",
+                MethodType.methodType(void.class, ColoredLightBlockEntity.class));
+        private static final MethodHandle UNREGISTER_LIGHT = find(
+                "com.lights.yesmenn.client.VeilColoredLightManager", "unregister",
+                MethodType.methodType(void.class, ColoredLightBlockEntity.class));
+        private static final MethodHandle REFRESH_TINT = find(
+                "com.lights.yesmenn.client.ColoredLightClientHooks", "refreshBlockTint",
+                MethodType.methodType(void.class, BlockPos.class));
+
+        private static MethodHandle find(String className, String name, MethodType type) {
+            try {
+                return MethodHandles.publicLookup().findStatic(Class.forName(className), name, type);
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return null;
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Missing client hook " + className + "#" + name, exception);
+            }
         }
     }
 }

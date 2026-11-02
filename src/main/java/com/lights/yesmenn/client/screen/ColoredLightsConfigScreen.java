@@ -2,7 +2,6 @@ package com.lights.yesmenn.client.screen;
 
 import com.lights.yesmenn.client.ColoredLightRenderConfig;
 import com.lights.yesmenn.compat.vilc.VilcConfigBridge;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
@@ -30,14 +29,12 @@ public final class ColoredLightsConfigScreen extends Screen {
     private final Object vilcConfig;
 
     public ColoredLightsConfigScreen(Screen parent) {
-        super(Component.translatable("screen.lightsyesmenn.colored_lights_config"));
+        super(VilcConfigBridge.available()
+                ? Component.literal("Lights? YesMenn! + VILC")
+                : Component.translatable("screen.lightsyesmenn.colored_lights_config"));
         this.parent = parent;
         this.vilcAvailable = VilcConfigBridge.available();
         this.vilcConfig = vilcAvailable ? VilcConfigBridge.config() : null;
-    }
-
-    public static void openFromVilc(Screen parent) {
-        Minecraft.getInstance().setScreen(new ColoredLightsConfigScreen(parent));
     }
 
     @Override
@@ -189,13 +186,13 @@ public final class ColoredLightsConfigScreen extends Screen {
 
         int columnLeft = left + 12;
         if (vilcConfig != null) {
-            drawColumnTitle(graphics, "VILC / Shader Limits", columnLeft, top + 34);
+            drawColumnTitle(graphics, "VILC: Rendering", columnLeft, top + 34);
             columnLeft += COLUMN_WIDTH + GAP;
         }
-        drawColumnTitle(graphics, "LightsYesMenn! / Veil", columnLeft, top + 34);
+        drawColumnTitle(graphics, vilcConfig != null ? "L?YM!: Lamp colors" : "LightsYesMenn! / Veil", columnLeft, top + 34);
         if (vilcConfig != null) {
             columnLeft += COLUMN_WIDTH + GAP;
-            drawColumnTitle(graphics, "VILC / Shader Colors", columnLeft, top + 34);
+            drawColumnTitle(graphics, "VILC: Light pass", columnLeft, top + 34);
         }
 
         graphics.pose().pushPose();

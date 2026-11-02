@@ -3,6 +3,7 @@ package com.lights.yesmenn;
 import com.lights.yesmenn.client.ColoredLightRenderConfig;
 import com.lights.yesmenn.client.screen.ColoredLightsConfigScreen;
 import com.lights.yesmenn.compat.veil.ColoredLightClientCompat;
+import com.lights.yesmenn.compat.vilc.VilcConfigBridge;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.common.NeoForge;
 public class LightsYesMennClient {
     public LightsYesMennClient(ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, (modContainer, parent) -> new ColoredLightsConfigScreen(parent));
+        VilcConfigBridge.registerCombinedScreen(ColoredLightsConfigScreen::new);
         ColoredLightRenderConfig.load();
         ColoredLightClientCompat.registerEventListeners();
     }

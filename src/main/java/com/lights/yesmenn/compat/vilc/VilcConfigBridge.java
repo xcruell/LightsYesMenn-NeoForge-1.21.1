@@ -1,16 +1,31 @@
 package com.lights.yesmenn.compat.vilc;
 
-import net.neoforged.fml.ModList;
+import net.minecraft.client.gui.screens.Screen;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.function.Function;
 
 public final class VilcConfigBridge {
     private VilcConfigBridge() {
     }
 
     public static boolean available() {
-        return ModList.get().isLoaded("veil_iris_lights");
+        return com.lights.yesmenn.compat.OptionalModCompat.vilcAvailable();
+    }
+
+    /** Makes VILC's mod-list entry and config key open the combined L?YM! + VILC screen. */
+    public static void registerCombinedScreen(Function<Screen, Screen> factory) {
+        if (!available()) {
+            return;
+        }
+        try {
+            Class.forName("com.yesmenn.veilirislights.client.screen.ConfigScreenBridge")
+                    .getMethod("registerCombinedScreen", Function.class)
+                    .invoke(null, factory);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            // Older VILC versions keep their own screen; L?YM!'s screen still shows the combined view.
+        }
     }
 
     public static Object config() {

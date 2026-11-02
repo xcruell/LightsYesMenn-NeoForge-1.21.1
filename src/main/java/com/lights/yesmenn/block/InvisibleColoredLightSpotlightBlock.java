@@ -19,7 +19,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public class InvisibleColoredLightSpotlightBlock extends ColoredLightSpotlightBlock {
     public static final MapCodec<InvisibleColoredLightSpotlightBlock> CODEC =
             simpleCodec(InvisibleColoredLightSpotlightBlock::new);
-    private static final VoxelShape SHAPE = box(5, 5, 5, 11, 11, 11);
+    private static final VoxelShape SHAPE = box(2, 2, 2, 14, 14, 14);
 
     public InvisibleColoredLightSpotlightBlock(Properties properties) {
         super(properties);

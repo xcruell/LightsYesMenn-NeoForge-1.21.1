@@ -1,6 +1,7 @@
 package com.lights.yesmenn.network;
 
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -20,7 +21,7 @@ public final class ModNetworking {
     private static void handleColoredLightAction(ColoredLightActionPayload payload,
                                                   net.neoforged.neoforge.network.handling.IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)
-                || player.distanceToSqr(payload.pos().getCenter()) > 64.0D
+                || !canEdit(player, payload.pos())
                 || !(player.level().getBlockEntity(payload.pos()) instanceof ColoredLightBlockEntity light)) {
             return;
         }
@@ -48,7 +49,7 @@ public final class ModNetworking {
     private static void handleColoredLightSpotlight(ColoredLightSpotlightPayload payload,
                                                      net.neoforged.neoforge.network.handling.IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)
-                || player.distanceToSqr(payload.pos().getCenter()) > 64.0D
+                || !canEdit(player, payload.pos())
                 || !(player.level().getBlockEntity(payload.pos()) instanceof ColoredLightBlockEntity light)) {
             return;
         }
@@ -61,6 +62,13 @@ public final class ModNetworking {
                 payload.size(),
                 payload.softness(),
                 payload.focus());
+    }
+
+    private static boolean canEdit(ServerPlayer player, BlockPos pos) {
+        return player.distanceToSqr(pos.getCenter()) <= 64.0D
+                && player.mayBuild()
+                && player.level().isLoaded(pos)
+                && player.level().mayInteract(player, pos);
     }
 
     private static void handleOpenColoredLightScreen(OpenColoredLightScreenPayload payload,
