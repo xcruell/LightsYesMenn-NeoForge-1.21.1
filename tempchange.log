@@ -44,3 +44,4 @@
 - Config screens: L?YM! alone -> L?YM! screen; VILC alone -> VILC screen; both -> combined "Lights? YesMenn! + VILC" screen from every entry point (both mod-list entries and VILC's O key) via ConfigScreenBridge.registerCombinedScreen. Removed unused openFromVilc.
 - License changed to CC BY-NC-SA 4.0 (LICENSE file with summary + full legal code, bundled into the jar as META-INF/LICENSE; mod_license=CC-BY-NC-SA-4.0).
 - License switched from CC BY-NC-SA 4.0 to the YesMenn Custom License 1.0 (same LICENSE as VILC; bundled as META-INF/LICENSE).
+- v1.1.1: spotlights now create real Veil SpotLightData (cone = Veil size, softness converted to Veil's soft-edge angle; focus and lens size via VILC). Panels stay area lights. Optional VILC dependency [1.5.2,) because older VILC cannot render spot lights.

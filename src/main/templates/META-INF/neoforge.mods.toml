@@ -100,3 +100,11 @@ config="${mod_id}.mixins.json"
     versionRange="[4.5.2,)"
     ordering="AFTER"
     side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="veil_iris_lights"
+    type="optional"
+    reason="L?YM! spotlights are Veil spot lights; VILC renders them with Iris from version 1.5.2 on."
+    versionRange="[1.5.2,)"
+    ordering="NONE"
+    side="CLIENT"

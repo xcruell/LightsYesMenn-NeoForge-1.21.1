@@ -10,6 +10,7 @@ import com.lights.yesmenn.compat.sable.SableSoundPositionCompat;
 import foundry.veil.api.client.render.VeilRenderSystem;
 import foundry.veil.api.client.render.light.data.AreaLightData;
 import foundry.veil.api.client.render.light.data.PointLightData;
+import foundry.veil.api.client.render.light.data.SpotLightData;
 import foundry.veil.api.client.render.light.renderer.LightRenderHandle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -120,6 +121,7 @@ public final class VeilColoredLightManager {
         private static final double SPOTLIGHT_LENS_OFFSET = 0.55;
         private LightRenderHandle<PointLightData> pointHandle;
         private LightRenderHandle<AreaLightData> areaHandle;
+        private LightRenderHandle<SpotLightData> spotHandle;
         private int color = -1;
         private int radius = -1;
         private Vec3 position;
@@ -174,17 +176,17 @@ public final class VeilColoredLightManager {
             Quaternionf nextOrientation = nextAreaTransform != null ? nextAreaTransform.orientation() : null;
             if (!nextEnabled) {
                 // Disabled lights are removed from Veil entirely instead of being kept at zero brightness.
-                if (pointHandle != null || areaHandle != null) {
+                if (pointHandle != null || areaHandle != null || spotHandle != null) {
                     free();
                 }
                 return;
             }
             if (!isValid(nextMode)) {
                 free();
-                if (nextMode == Mode.PANEL || nextMode == Mode.SPOTLIGHT) {
-                    createAreaLight(blockEntity, nextPosition, nextOrientation, nextMode);
-                } else {
-                    createPointLight(blockEntity, nextPosition);
+                switch (nextMode) {
+                    case PANEL -> createPanelLight(blockEntity, nextPosition, nextOrientation);
+                    case SPOTLIGHT -> createSpotLight(blockEntity, nextPosition, nextOrientation);
+                    case POINT -> createPointLight(blockEntity, nextPosition);
                 }
                 color = blockEntity.getColor();
                 radius = blockEntity.getRadius();
@@ -241,33 +243,34 @@ public final class VeilColoredLightManager {
             }
 
             float[] nextColorValues = adjustedColor(nextColor, renderConfig);
-            if (nextMode == Mode.PANEL || nextMode == Mode.SPOTLIGHT) {
+            boolean orientationChanged = forwardChanged || facingChanged || beamFacingChanged || spotlightSettingsChanged;
+            float lightBrightness = brightnessMultiplier(nextLightBrightness) * exposure(renderConfig);
+            if (nextMode == Mode.PANEL) {
                 AreaLightData data = areaHandle.getLightData();
                 if (positionChanged) {
                     data.getPosition().set(nextPosition.x, nextPosition.y, nextPosition.z);
                 }
-                if (forwardChanged || facingChanged || beamFacingChanged) {
+                if (orientationChanged) {
                     data.getOrientation().set(nextOrientation);
                 }
-                float halfSize = nextMode == Mode.SPOTLIGHT ? nextSpotlightSize / 100.0F : PANEL_HALF_SIZE;
-                data.setSize(
-                        halfSize,
-                        halfSize);
-                data.setAngle(nextMode == Mode.SPOTLIGHT ? (float) Math.toRadians(nextSpotlightAngle) : PANEL_ANGLE);
-                data
-                        .setColor(
-                                nextColorValues[0],
-                                nextColorValues[1],
-                                nextColorValues[2])
+                data.setColor(nextColorValues[0], nextColorValues[1], nextColorValues[2])
                         .setDistance(nextRadius)
-                        .setBrightness(brightnessMultiplier(nextLightBrightness) * exposure(renderConfig));
-                if (spotlightSettingsChanged && !facingChanged && !beamFacingChanged && !forwardChanged) {
-                    data.getOrientation().set(nextOrientation);
-                }
-                if (nextMode == Mode.SPOTLIGHT) {
-                    setAreaShape(data, nextSpotlightSoftness, nextSpotlightFocus);
-                }
+                        .setBrightness(lightBrightness);
                 areaHandle.markDirty();
+            } else if (nextMode == Mode.SPOTLIGHT) {
+                SpotLightData data = spotHandle.getLightData();
+                if (positionChanged) {
+                    data.getPositionMutable().set(nextPosition.x, nextPosition.y, nextPosition.z);
+                }
+                if (orientationChanged) {
+                    data.getOrientationMutable().set(nextOrientation);
+                }
+                applySpotCone(data, nextSpotlightAngle, nextSpotlightSoftness);
+                data.setColor(nextColorValues[0], nextColorValues[1], nextColorValues[2])
+                        .setDistance(nextRadius)
+                        .setBrightness(lightBrightness);
+                setSpotShape(data, nextSpotlightFocus, nextSpotlightSize);
+                spotHandle.markDirty();
             } else {
                 PointLightData data = pointHandle.getLightData();
                 if (positionChanged) {
@@ -314,9 +317,11 @@ public final class VeilColoredLightManager {
         }
 
         private boolean isValid(Mode nextMode) {
-            return nextMode == Mode.PANEL || nextMode == Mode.SPOTLIGHT
-                    ? areaHandle != null && areaHandle.isValid()
-                    : pointHandle != null && pointHandle.isValid();
+            return switch (nextMode) {
+                case PANEL -> areaHandle != null && areaHandle.isValid();
+                case SPOTLIGHT -> spotHandle != null && spotHandle.isValid();
+                case POINT -> pointHandle != null && pointHandle.isValid();
+            };
         }
 
         private void createPointLight(ColoredLightBlockEntity blockEntity, Vec3 position) {
@@ -335,46 +340,64 @@ public final class VeilColoredLightManager {
             storeRenderConfig(renderConfig);
         }
 
-        private void createAreaLight(ColoredLightBlockEntity blockEntity, Vec3 position, Quaternionf orientation, Mode nextMode) {
+        private void createPanelLight(ColoredLightBlockEntity blockEntity, Vec3 position, Quaternionf orientation) {
             ColoredLightRenderConfig renderConfig = activeRenderConfig();
             float[] colorValues = adjustedColor(blockEntity.getColor(), renderConfig);
             AreaLightData data = new AreaLightData()
-                    .setSize(
-                            nextMode == Mode.SPOTLIGHT ? blockEntity.getSpotlightSize() / 100.0F : PANEL_HALF_SIZE,
-                            nextMode == Mode.SPOTLIGHT ? blockEntity.getSpotlightSize() / 100.0F : PANEL_HALF_SIZE)
-                    .setAngle(nextMode == Mode.SPOTLIGHT
-                            ? (float) Math.toRadians(blockEntity.getSpotlightAngle())
-                            : PANEL_ANGLE)
+                    .setSize(PANEL_HALF_SIZE, PANEL_HALF_SIZE)
+                    .setAngle(PANEL_ANGLE)
                     .setDistance(blockEntity.getRadius())
-                    .setColor(
-                            colorValues[0],
-                            colorValues[1],
-                            colorValues[2])
+                    .setColor(colorValues[0], colorValues[1], colorValues[2])
                     .setBrightness(brightnessMultiplier(blockEntity.getBrightness()) * exposure(renderConfig))
                     .setOcclusionEnabled(false);
             data.getPosition().set(position.x, position.y, position.z);
             data.getOrientation().set(orientation);
-            if (nextMode == Mode.SPOTLIGHT) {
-                setAreaShape(data, blockEntity.getSpotlightSoftness(), blockEntity.getSpotlightFocus());
-            }
             areaHandle = VeilRenderSystem.renderer().getLightRenderer().addLight(data);
             storeRenderConfig(renderConfig);
         }
 
-        private static void setAreaShape(AreaLightData data, int softness, int focus) {
-            MethodHandle set = AreaShapeBridge.SET;
+        private void createSpotLight(ColoredLightBlockEntity blockEntity, Vec3 position, Quaternionf orientation) {
+            ColoredLightRenderConfig renderConfig = activeRenderConfig();
+            float[] colorValues = adjustedColor(blockEntity.getColor(), renderConfig);
+            SpotLightData data = new SpotLightData()
+                    .setDistance(blockEntity.getRadius())
+                    .setColor(colorValues[0], colorValues[1], colorValues[2])
+                    .setBrightness(brightnessMultiplier(blockEntity.getBrightness()) * exposure(renderConfig))
+                    .setOcclusionEnabled(false);
+            applySpotCone(data, blockEntity.getSpotlightAngle(), blockEntity.getSpotlightSoftness());
+            data.getPositionMutable().set(position.x, position.y, position.z);
+            data.getOrientationMutable().set(orientation);
+            setSpotShape(data, blockEntity.getSpotlightFocus(), blockEntity.getSpotlightSize());
+            spotHandle = VeilRenderSystem.renderer().getLightRenderer().addLight(data);
+            storeRenderConfig(renderConfig);
+        }
+
+        /**
+         * Veil spot lights: size = cone half-angle, angle = width of the soft edge inside the cone (radians).
+         * The softness slider (1-50) is a cone-edge width in cosine space, converted so Veil and VILC draw the same edge.
+         */
+        private static void applySpotCone(SpotLightData data, int angleDegrees, int softness) {
+            float cone = (float) Math.toRadians(angleDegrees);
+            double cosInner = Math.min(1.0, Math.cos(cone) + softness / 100.0);
+            float edgeWidth = (float) Math.max(0.001, cone - Math.acos(cosInner));
+            data.setSize(cone);
+            data.setAngle(edgeWidth);
+        }
+
+        private static void setSpotShape(SpotLightData data, int focus, int lensSize) {
+            MethodHandle set = SpotShapeBridge.SET;
             if (set == null) {
-                // VILC is optional; plain Veil ignores the extra beam-shape controls.
+                // VILC is optional; plain Veil ignores focus and lens size.
                 return;
             }
             try {
-                set.invokeExact(data, softness / 100.0F, focus / 100.0F);
+                set.invokeExact(data, focus / 100.0F, lensSize / 100.0F);
             } catch (Throwable ignored) {
             }
         }
 
-        private static void clearAreaShape(AreaLightData data) {
-            MethodHandle clear = AreaShapeBridge.CLEAR;
+        private static void clearSpotShape(SpotLightData data) {
+            MethodHandle clear = SpotShapeBridge.CLEAR;
             if (clear == null) {
                 return;
             }
@@ -592,11 +615,15 @@ public final class VeilColoredLightManager {
                 pointHandle.free();
             }
             if (areaHandle != null && areaHandle.isValid()) {
-                clearAreaShape(areaHandle.getLightData());
                 areaHandle.free();
+            }
+            if (spotHandle != null && spotHandle.isValid()) {
+                clearSpotShape(spotHandle.getLightData());
+                spotHandle.free();
             }
             pointHandle = null;
             areaHandle = null;
+            spotHandle = null;
             position = null;
             facing = null;
             beamFacing = null;
@@ -624,11 +651,11 @@ public final class VeilColoredLightManager {
             SPOTLIGHT
         }
 
-        private static final class AreaShapeBridge {
+        private static final class SpotShapeBridge {
             private static final MethodHandle SET = find("set",
-                    MethodType.methodType(void.class, AreaLightData.class, float.class, float.class));
+                    MethodType.methodType(void.class, SpotLightData.class, float.class, float.class));
             private static final MethodHandle CLEAR = find("clear",
-                    MethodType.methodType(void.class, AreaLightData.class));
+                    MethodType.methodType(void.class, SpotLightData.class));
 
             private static MethodHandle find(String name, MethodType type) {
                 if (!OptionalModCompat.vilcAvailable()) {
