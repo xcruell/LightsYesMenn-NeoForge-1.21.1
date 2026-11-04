@@ -90,6 +90,24 @@ public final class VilcConfigBridge {
         invoke(config, "markCustom");
     }
 
+    /** Whether this VILC version has the given config option (options differ between versions). */
+    public static boolean hasField(Object config, String field) {
+        if (config == null) {
+            return false;
+        }
+        try {
+            config.getClass().getField(field);
+            return true;
+        } catch (NoSuchFieldException exception) {
+            return false;
+        }
+    }
+
+    /** Sets an option that is not part of the quality presets, so the preset stays as it is. */
+    public static void setField(Object config, String field, Object value) {
+        set(config, field, value);
+    }
+
     public static double getDouble(Object config, String field) {
         Object value = get(config, field);
         return value instanceof Number number ? number.doubleValue() : 0.0;

@@ -45,3 +45,57 @@
 - License changed to CC BY-NC-SA 4.0 (LICENSE file with summary + full legal code, bundled into the jar as META-INF/LICENSE; mod_license=CC-BY-NC-SA-4.0).
 - License switched from CC BY-NC-SA 4.0 to the YesMenn Custom License 1.0 (same LICENSE as VILC; bundled as META-INF/LICENSE).
 - v1.1.1: spotlights now create real Veil SpotLightData (cone = Veil size, softness converted to Veil's soft-edge angle; focus and lens size via VILC). Panels stay area lights. Optional VILC dependency [1.5.2,) because older VILC cannot render spot lights.
+- Colorful Flashlight (lightsyesmenn:colorful_flashlight): handheld Veil spot light following the player's view (also visible on other players). Use toggles on/off, sneak + use opens the light GUI in flashlight mode (range, color, brightness, beam angle/size/softness/focus; no redstone/yaw/pitch). Settings live in the item's custom data, synced throttled via FlashlightConfigPayload. Lens layer of the item is tinted with the beam color (dimmed when off). Recipe: glass pane / iron+redstone+iron / amethyst shard.
+- Shared Veil conversion helpers moved to ColoredLightVeilSupport (used by lamps and flashlight).
+- de_de.json was Latin-1 encoded (umlauts broken in-game); converted to UTF-8.
+2026-11-04 - Flashlight upgrade, flicker, light beams (needs VILC 1.5.2 for beams/hand/fringe)
+- Flashlight is now two Veil spot lights: focused core + wider, softer, dimmer spill cone (2.2x angle, 0.8x range). New "Spill light %" slider (default 40, 0 = core only).
+- Flashlight never lights the first-person hand/held item (VILC extras API, skipFirstPerson).
+- Flashlight "Color fringe %" (default 20): chromatic aberration at the beam edge (VILC extras API).
+- New effects card in the light GUI for lamps and the flashlight: "Flicker %" (gentle bulb flicker: slow drift, faint filament buzz, rare short dips; own phase per light, updated per frame) and "Light beam %" (Veil in-scattering strength, rendered by VILC; default 0 for lamps, 30 for the flashlight).
+- Flicker/glow stored in block entity NBT (Flicker, Glow) and flashlight custom data (FlashlightSpill/Glow/Fringe/Flicker); older items/lamps use defaults. New action payloads SET_FLICKER/SET_GLOW; open-screen payload and FlashlightSettings carry the new fields.
+- Network protocol version bumped 1 -> 2 (client and server must both update).
+- Light GUI is ~40 px taller for the effects card.
+2026-11-04 - Stronger flicker
+- Flicker was too rare/weak even at 100 % (~16 % drift, dips only every few minutes; VILC's soft light compression hid most of it). New curve: wavering drift + fast filament buzz + random short dips in 1/8 s slots. 20 % stays subtle (min ~80 % brightness), 50 % ~16 visible dips/min, 100 % ~1 dip/s down to ~10-25 % brightness.
+2026-11-04 - Hanging lamp
+- New block "Hanging Lamp" (hanging_lamp): hangs from the underside of a block (needs a ceiling, breaks when it is removed). Acts as a spot light that always shines straight down from the bulb, with a much wider cone than a spotlight: angle up to 88 deg half-angle (~176 deg), default 80 deg, softness 30, lens 12.
+- Same light GUI as spotlights (color, brightness, radius, flicker, light beam, cone settings) but without yaw/pitch; yaw/pitch copied on with the configurator are ignored.
+- Bulb glass and filament are fullbright while the lamp is on (separate hanging_lamp_on model); redstone switching like the other lamps. Translucent render type for the glass bulb.
+- Model: texture paths point to block/hanging_lamp/*; three Blockbench multi-axis Euler rotations (not supported by 1.21.1) converted to equivalent single-axis Y rotations.
+- Blockstate, item model, loot table, recipe (chain / iron + colored light + iron / glass pane), pickaxe and Sable light tags, creative tab entry, de/en names.
+2026-11-04 - Combined config screen: VILC light beam options
+- The combined L?YM! + VILC config screen showed VILC's removed "Detailed normals" option and lacked the new light beam settings. Its VILC column now adds "Light beams: ON/OFF" and "Light beam quality: Low/Medium/High" (VILC 1.5.2+), and only shows "Detailed normals" for older VILC versions that still have it.
+2026-11-04 - Hanging lamp filament, GUI layout, larger ranges
+- Hanging lamp filament is now drawn by the block entity renderer: bulb_wire_off while off; after switching on the bulb_wire_anim strip plays once (2 ticks per frame), then bulb_wire_on stays. While lit it is fullbright and tinted with the lamp color (like the glowing core of the colored light). Lamps that are already on when they come into view skip the warm-up.
+- bulb_wire_anim.png.mcmeta removed: with it the atlas would loop the strip forever; the renderer now picks the frames itself (no frame interpolation).
+- Wire planes removed from the block models (hanging_lamp / hanging_lamp_on); new hanging_lamp_item model keeps the lit filament for the item.
+- Hanging lamp GUI: flicker and light beam sliders moved into the spotlight panel (the free yaw/pitch rows); the main panel loses the effects card and is shorter.
+- Radius limits raised: lamps (colored light, tube, panel, hanging lamp, invisible point light) up to 64, spotlights (normal, big, invisible) and the flashlight range up to 128. Radius number fields take 3 digits.
+- The radius moved from the block state property (1-32, would need 128 values x facing states) into the block entity (NBT "Radius"); lights saved before keep their old block state radius until changed. The block state property stays for compatibility.
+- Monster spawn protection keeps its 32 block reach (larger radii only affect rendering).
+2026-11-04 - Radius/spotlight sync fixes, spawn protection index, review
+- Fixed: radius jumped back to 32 for every light except the flashlight. The SET_CONFIG packet packed the radius into 5 bits (max 32); it now uses 7 bits (1-128) and the redstone flag moved to bit 31. Network protocol version 2 -> 3.
+- Fixed: spotlights sometimes jumped back to their saved/default settings while moving a slider. Spotlight sliders only changed the client preview, but every other slider synced to the server, whose answer (full block entity data) still carried the old spotlight values. Spotlight settings are now synced with the other settings (throttled, 100 ms), and the screen re-applies its preview every tick.
+- Monster spawn protection uses a coverage index: each light is entered into every chunk its radius reaches (only on load / radius change), so a spawn check is one map lookup plus a distance test against the few lights covering that chunk, independent of the radius. Protection now covers the full light radius again (lamps up to 64, spotlights up to 128) instead of being capped at 32.
+- Item colors and the configurator tooltip no longer copy the item's NBT tag every frame (read in place).
+2026-11-04 - Hanging lamp warm-up
+- New "Warm-up" setting for the hanging lamp (0.0-10.0 s in 0.1 s steps, default 3.0 s), in the spotlight panel below flicker and light beam. After switching on, the light starts as a dim glow (5 %) and rises smoothly to full brightness over that time, like an HQL lamp; combines with flicker. Lamps that are already on when they load light up immediately.
+- Stored as block entity NBT "Warmup" (tenths of a second); new action SET_WARMUP, open-screen payload carries it. Network protocol version 3 -> 4.
+- Number sliders can show formatted values (warm-up shows "3.0 s").
+2026-11-04 - Filament animation follows warm-up
+- The hanging lamp's bulb_wire_anim strip now plays over the lamp's warm-up time (frames spread evenly) instead of a fixed 2 ticks per frame, so the filament glows up in step with the light. Warm-up 0 s switches straight to bulb_wire_on.
+2026-11-04 - Hanging lamp warm-up color
+- New "Warm-up color" button for the hanging lamp (Off / Blue / Red / Yellow / Green / White, default Off), next to the reset button in the spotlight panel. The light starts in that color and blends into the lamp color over the warm-up time (same easing as the brightness), like an HQL lamp starting bluish. "Off" keeps the lamp's own color the whole time.
+- The filament follows the same color blend while it glows up.
+- Stored as block entity NBT "WarmupTint"; new action SET_WARMUP_TINT, open-screen payload carries it. Network protocol version 4 -> 5.
+2026-11-04 - Glowing filament
+- The lit hanging lamp filament is drawn in two passes: a fullbright core that is only lightly tinted (35 % lamp color, rest white, instead of the hard full tint) and an additive, emissive glow layer in the lamp color ("eyes" render type, treated as glowing by shaderpacks), 18 % larger so the edges bleed into the bulb like the colored light's core. The glow fades in with the warm-up and follows the warm-up color.
+- bulb_wire_on.png / bulb_wire_off.png: fully transparent pixels had white RGB, which the additive glow would have drawn as a bright rectangle; set to black (no visible change otherwise).
+2026-11-04 - Filament glow test
+- Test: the lit filament draws only the additive glow layer (GLOW_ONLY in HangingLampWireRenderer); the separate tinted core z-fought with it. The off filament is unchanged.
+2026-11-04 - Filament sandwich
+- Lit filament: lightly tinted core in the middle again, with the additive glow layer drawn just in front of and behind it (0.05 px offset, no more z-fighting, core stays visible).
+- (VILC side) light beams now render at half resolution, which makes wide 64 block beams much cheaper.
+2026-11-04 - VILC version reference
+- VILC's next release is 1.6.0 instead of 1.5.2: optional dependency range is now [1.6.0,), comments updated.

@@ -75,6 +75,11 @@ public class ColoredLightSpotlightRenderer implements BlockEntityRenderer<Colore
                     ColoredLightCompatRegistry.INVISIBLE_COLORED_POINTLIGHT_ITEM.get(), INVISIBLE_POINTLIGHT_MODEL);
             return;
         }
+        // The hanging lamp is a static block model plus its animated filament.
+        if (state.getBlock() instanceof com.lights.yesmenn.block.HangingLampBlock) {
+            HangingLampWireRenderer.render(blockEntity, partialTick, poseStack, bufferSource, packedLight, packedOverlay);
+            return;
+        }
         if (!(state.getBlock() instanceof ColoredLightSpotlightBlock)) {
             return;
         }

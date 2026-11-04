@@ -33,6 +33,9 @@ public class ColoredLightBlock extends BaseEntityBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
     public static final BooleanProperty REDSTONE_INVERTED = BooleanProperty.create("redstone_inverted");
     public static final int DEFAULT_RADIUS = 8;
+    /** Largest radius of lamps; spotlights (and the flashlight) reach further. */
+    public static final int MAX_LAMP_RADIUS = 64;
+    public static final int MAX_SPOTLIGHT_RADIUS = 128;
 
     public ColoredLightBlock(Properties properties) {
         super(properties);
@@ -110,6 +113,16 @@ public class ColoredLightBlock extends BaseEntityBlock {
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(RADIUS, POWERED, REDSTONE_INVERTED);
+    }
+
+    /**
+     * Largest radius/range for the given light. Since 64/128 do not fit the old {@link #RADIUS} block state property
+     * (1-32), the radius lives in the block entity; the property is only read for lights saved before that change.
+     */
+    public static int maxRadius(BlockState state) {
+        return state.getBlock() instanceof ColoredLightSpotlightBlock && !(state.getBlock() instanceof HangingLampBlock)
+                ? MAX_SPOTLIGHT_RADIUS
+                : MAX_LAMP_RADIUS;
     }
 
     public static boolean isLightEnabled(BlockState state) {

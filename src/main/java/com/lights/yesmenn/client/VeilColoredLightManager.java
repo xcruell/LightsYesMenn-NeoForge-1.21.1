@@ -4,14 +4,15 @@ import com.lights.yesmenn.LightsYesMenn;
 import com.lights.yesmenn.block.ColoredLightBlock;
 import com.lights.yesmenn.block.ColoredLightPanelBlock;
 import com.lights.yesmenn.block.ColoredLightSpotlightBlock;
+import com.lights.yesmenn.block.HangingLampBlock;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
-import com.lights.yesmenn.compat.OptionalModCompat;
 import com.lights.yesmenn.compat.sable.SableSoundPositionCompat;
 import foundry.veil.api.client.render.VeilRenderSystem;
 import foundry.veil.api.client.render.light.data.AreaLightData;
 import foundry.veil.api.client.render.light.data.PointLightData;
 import foundry.veil.api.client.render.light.data.SpotLightData;
 import foundry.veil.api.client.render.light.renderer.LightRenderHandle;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Direction;
@@ -22,12 +23,20 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.activeRenderConfig;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.adjustedColor;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.applySpotCone;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.brightnessMultiplier;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.clearSpotShape;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.exposure;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.flickerFactor;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.inscattering;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.orientationFromForward;
+import static com.lights.yesmenn.client.ColoredLightVeilSupport.setSpotShape;
 
 public final class VeilColoredLightManager {
     private static final Map<ColoredLightBlockEntity, ManagedLight> LIGHTS = new IdentityHashMap<>();
@@ -66,6 +75,18 @@ public final class VeilColoredLightManager {
                 updateMoving();
             } finally {
                 renderPartialTick = null;
+            }
+            updateFlicker();
+        }
+    }
+
+    // Flicker and warm-up change brightness every frame; only lights using them are touched.
+    private static void updateFlicker() {
+        long now = Util.getMillis();
+        double seconds = now / 1000.0;
+        for (ManagedLight light : LIGHTS.values()) {
+            if (light.flicker > 0 || light.warmupStartMillis != ManagedLight.NOT_WARMING) {
+                light.applyFlicker(seconds, now);
             }
         }
     }
@@ -119,6 +140,9 @@ public final class VeilColoredLightManager {
         private static final float PANEL_ANGLE = (float) Math.toRadians(60.0);
         private static final double PANEL_PLANE_OFFSET = -0.235;
         private static final double SPOTLIGHT_LENS_OFFSET = 0.55;
+        private static final long NOT_WARMING = Long.MIN_VALUE;
+        /** Brightness share right after switching on; an HQL lamp starts as a dim glow. */
+        private static final float WARMUP_START = 0.05F;
         private LightRenderHandle<PointLightData> pointHandle;
         private LightRenderHandle<AreaLightData> areaHandle;
         private LightRenderHandle<SpotLightData> spotHandle;
@@ -135,6 +159,17 @@ public final class VeilColoredLightManager {
         private int spotlightSize = -1;
         private int spotlightSoftness = -1;
         private int spotlightFocus = -1;
+        private int flicker = -1;
+        private int glow = -1;
+        private float baseBrightness;
+        private long seed;
+        /** Warm-up of hanging lamps after switching on (not reset by free(): it spans the off -> on change). */
+        private boolean switchedOff;
+        private long warmupStartMillis = NOT_WARMING;
+        private long warmupMillis;
+        /** Lamp color as sent to Veil, and the warm-up tint it blends in from (null = no tint). */
+        private float[] baseColor;
+        private float[] warmupTintColor;
         private double exposure = Double.NaN;
         private double colorStrength = Double.NaN;
         private double colorSaturation = Double.NaN;
@@ -153,8 +188,10 @@ public final class VeilColoredLightManager {
             Vec3 blockCenter = sableTransform.center();
             int nextBrightness = blockEntity.getBrightness();
             int nextSpotlightAngle = blockEntity.getSpotlightAngle();
-            int nextSpotlightYaw = blockEntity.getSpotlightYaw();
-            int nextSpotlightPitch = blockEntity.getSpotlightPitch();
+            // A hanging lamp always shines straight down, whatever yaw/pitch got copied onto it.
+            boolean hangingLamp = blockEntity.getBlockState().getBlock() instanceof HangingLampBlock;
+            int nextSpotlightYaw = hangingLamp ? 0 : blockEntity.getSpotlightYaw();
+            int nextSpotlightPitch = hangingLamp ? 0 : blockEntity.getSpotlightPitch();
             int nextSpotlightSize = blockEntity.getSpotlightSize();
             int nextSpotlightSoftness = blockEntity.getSpotlightSoftness();
             int nextSpotlightFocus = blockEntity.getSpotlightFocus();
@@ -179,8 +216,14 @@ public final class VeilColoredLightManager {
                 if (pointHandle != null || areaHandle != null || spotHandle != null) {
                     free();
                 }
+                switchedOff = true;
+                warmupStartMillis = NOT_WARMING;
                 return;
             }
+            // Lamps already on when they load light up at once; only switching on warms up.
+            warmupMillis = hangingLamp ? blockEntity.getWarmup() * 100L : 0L;
+            int tint = hangingLamp ? HangingLampBlock.warmupTint(blockEntity.getWarmupTint()) : -1;
+            warmupTintColor = tint >= 0 ? adjustedColor(tint, activeRenderConfig()) : null;
             if (!isValid(nextMode)) {
                 free();
                 switch (nextMode) {
@@ -198,11 +241,21 @@ public final class VeilColoredLightManager {
                 mode = nextMode;
                 spotlightAngle = blockEntity.getSpotlightAngle();
                 spotlightBrightness = blockEntity.getBrightness();
-                spotlightYaw = blockEntity.getSpotlightYaw();
-                spotlightPitch = blockEntity.getSpotlightPitch();
+                spotlightYaw = nextSpotlightYaw;
+                spotlightPitch = nextSpotlightPitch;
                 spotlightSize = blockEntity.getSpotlightSize();
                 spotlightSoftness = blockEntity.getSpotlightSoftness();
                 spotlightFocus = blockEntity.getSpotlightFocus();
+                flicker = blockEntity.getFlicker();
+                glow = blockEntity.getGlow();
+                seed = blockEntity.getBlockPos().asLong();
+                baseBrightness = brightnessMultiplier(blockEntity.getBrightness()) * exposure(activeRenderConfig());
+                baseColor = adjustedColor(blockEntity.getColor(), activeRenderConfig());
+                if (switchedOff && warmupMillis > 0) {
+                    warmupStartMillis = Util.getMillis();
+                    applyFlicker(warmupStartMillis / 1000.0, warmupStartMillis);
+                }
+                switchedOff = false;
                 LightsYesMenn.LOGGER.trace(
                         "Registered Veil colored {} light at {} with color #{}, radius {}",
                         nextMode.name().toLowerCase(),
@@ -215,6 +268,8 @@ public final class VeilColoredLightManager {
             int nextColor = blockEntity.getColor();
             int nextRadius = blockEntity.getRadius();
             int nextLightBrightness = nextBrightness;
+            int nextFlicker = blockEntity.getFlicker();
+            int nextGlow = blockEntity.getGlow();
             ColoredLightRenderConfig renderConfig = activeRenderConfig();
             boolean renderConfigChanged = renderConfigChanged(renderConfig);
             boolean positionChanged = position == null || position.distanceToSqr(nextPosition) > 0.000001;
@@ -238,7 +293,9 @@ public final class VeilColoredLightManager {
                     && !beamFacingChanged
                     && !renderConfigChanged
                     && !brightnessChanged
-                    && !spotlightSettingsChanged) {
+                    && !spotlightSettingsChanged
+                    && nextFlicker == flicker
+                    && nextGlow == glow) {
                 return;
             }
 
@@ -255,7 +312,8 @@ public final class VeilColoredLightManager {
                 }
                 data.setColor(nextColorValues[0], nextColorValues[1], nextColorValues[2])
                         .setDistance(nextRadius)
-                        .setBrightness(lightBrightness);
+                        .setBrightness(lightBrightness)
+                        .setInscatteringStrength(inscattering(nextGlow));
                 areaHandle.markDirty();
             } else if (nextMode == Mode.SPOTLIGHT) {
                 SpotLightData data = spotHandle.getLightData();
@@ -268,7 +326,8 @@ public final class VeilColoredLightManager {
                 applySpotCone(data, nextSpotlightAngle, nextSpotlightSoftness);
                 data.setColor(nextColorValues[0], nextColorValues[1], nextColorValues[2])
                         .setDistance(nextRadius)
-                        .setBrightness(lightBrightness);
+                        .setBrightness(lightBrightness)
+                        .setInscatteringStrength(inscattering(nextGlow));
                 setSpotShape(data, nextSpotlightFocus, nextSpotlightSize);
                 spotHandle.markDirty();
             } else {
@@ -282,7 +341,8 @@ public final class VeilColoredLightManager {
                                 nextColorValues[1],
                                 nextColorValues[2])
                         .setRadius(nextRadius)
-                        .setBrightness(brightnessMultiplier(nextLightBrightness) * exposure(renderConfig));
+                        .setBrightness(lightBrightness)
+                        .setInscatteringStrength(inscattering(nextGlow));
                 pointHandle.markDirty();
             }
             color = nextColor;
@@ -299,7 +359,49 @@ public final class VeilColoredLightManager {
             spotlightSize = nextSpotlightSize;
             spotlightSoftness = nextSpotlightSoftness;
             spotlightFocus = nextSpotlightFocus;
+            flicker = nextFlicker;
+            glow = nextGlow;
+            baseBrightness = lightBrightness;
+            baseColor = nextColorValues;
             storeRenderConfig(renderConfig);
+        }
+
+        private void applyFlicker(double seconds, long nowMillis) {
+            float warm = warmupProgress(nowMillis);
+            float brightness = baseBrightness * flickerFactor(flicker, seed, seconds)
+                    * (WARMUP_START + (1.0F - WARMUP_START) * warm);
+            if (pointHandle != null && pointHandle.isValid()) {
+                pointHandle.getLightData().setBrightness(brightness);
+                pointHandle.markDirty();
+            } else if (areaHandle != null && areaHandle.isValid()) {
+                areaHandle.getLightData().setBrightness(brightness);
+                areaHandle.markDirty();
+            } else if (spotHandle != null && spotHandle.isValid()) {
+                SpotLightData data = spotHandle.getLightData();
+                data.setBrightness(brightness);
+                // Warm-up color: starts in the tint and blends into the lamp color (restored exactly at the end).
+                if (warmupTintColor != null && baseColor != null) {
+                    data.setColor(
+                            warmupTintColor[0] + (baseColor[0] - warmupTintColor[0]) * warm,
+                            warmupTintColor[1] + (baseColor[1] - warmupTintColor[1]) * warm,
+                            warmupTintColor[2] + (baseColor[2] - warmupTintColor[2]) * warm);
+                }
+                spotHandle.markDirty();
+            }
+        }
+
+        /** Eased warm-up progress 0..1 (1 = not warming); ends the warm-up when it is done. */
+        private float warmupProgress(long nowMillis) {
+            if (warmupStartMillis == NOT_WARMING) {
+                return 1.0F;
+            }
+            double progress = warmupMillis > 0 ? (nowMillis - warmupStartMillis) / (double) warmupMillis : 1.0;
+            if (progress >= 1.0) {
+                warmupStartMillis = NOT_WARMING;
+                return 1.0F;
+            }
+            double clamped = Math.max(0.0, progress);
+            return (float) (clamped * clamped * (3.0 - 2.0 * clamped));
         }
 
         private SableSoundPositionCompat.ResolvedTransform resolveSableTransform(ColoredLightBlockEntity blockEntity) {
@@ -335,6 +437,7 @@ public final class VeilColoredLightManager {
                             colorValues[2])
                     .setRadius(blockEntity.getRadius())
                     .setBrightness(brightnessMultiplier(blockEntity.getBrightness()) * exposure(renderConfig))
+                    .setInscatteringStrength(inscattering(blockEntity.getGlow()))
                     .setOcclusionEnabled(false);
             pointHandle = VeilRenderSystem.renderer().getLightRenderer().addLight(data);
             storeRenderConfig(renderConfig);
@@ -349,6 +452,7 @@ public final class VeilColoredLightManager {
                     .setDistance(blockEntity.getRadius())
                     .setColor(colorValues[0], colorValues[1], colorValues[2])
                     .setBrightness(brightnessMultiplier(blockEntity.getBrightness()) * exposure(renderConfig))
+                    .setInscatteringStrength(inscattering(blockEntity.getGlow()))
                     .setOcclusionEnabled(false);
             data.getPosition().set(position.x, position.y, position.z);
             data.getOrientation().set(orientation);
@@ -363,6 +467,7 @@ public final class VeilColoredLightManager {
                     .setDistance(blockEntity.getRadius())
                     .setColor(colorValues[0], colorValues[1], colorValues[2])
                     .setBrightness(brightnessMultiplier(blockEntity.getBrightness()) * exposure(renderConfig))
+                    .setInscatteringStrength(inscattering(blockEntity.getGlow()))
                     .setOcclusionEnabled(false);
             applySpotCone(data, blockEntity.getSpotlightAngle(), blockEntity.getSpotlightSoftness());
             data.getPositionMutable().set(position.x, position.y, position.z);
@@ -370,45 +475,6 @@ public final class VeilColoredLightManager {
             setSpotShape(data, blockEntity.getSpotlightFocus(), blockEntity.getSpotlightSize());
             spotHandle = VeilRenderSystem.renderer().getLightRenderer().addLight(data);
             storeRenderConfig(renderConfig);
-        }
-
-        /**
-         * Veil spot lights: size = cone half-angle, angle = width of the soft edge inside the cone (radians).
-         * The softness slider (1-50) is a cone-edge width in cosine space, converted so Veil and VILC draw the same edge.
-         */
-        private static void applySpotCone(SpotLightData data, int angleDegrees, int softness) {
-            float cone = (float) Math.toRadians(angleDegrees);
-            double cosInner = Math.min(1.0, Math.cos(cone) + softness / 100.0);
-            float edgeWidth = (float) Math.max(0.001, cone - Math.acos(cosInner));
-            data.setSize(cone);
-            data.setAngle(edgeWidth);
-        }
-
-        private static void setSpotShape(SpotLightData data, int focus, int lensSize) {
-            MethodHandle set = SpotShapeBridge.SET;
-            if (set == null) {
-                // VILC is optional; plain Veil ignores focus and lens size.
-                return;
-            }
-            try {
-                set.invokeExact(data, focus / 100.0F, lensSize / 100.0F);
-            } catch (Throwable ignored) {
-            }
-        }
-
-        private static void clearSpotShape(SpotLightData data) {
-            MethodHandle clear = SpotShapeBridge.CLEAR;
-            if (clear == null) {
-                return;
-            }
-            try {
-                clear.invokeExact(data);
-            } catch (Throwable ignored) {
-            }
-        }
-
-        private static float brightnessMultiplier(int brightness) {
-            return Math.max(25, Math.min(800, brightness)) / 100.0F;
         }
 
         private static AreaTransform panelTransform(SableSoundPositionCompat.ResolvedTransform sableTransform, Direction facing) {
@@ -441,12 +507,6 @@ public final class VeilColoredLightManager {
 
         private static Vec3 directionVector(Direction direction) {
             return new Vec3(direction.getStepX(), direction.getStepY(), direction.getStepZ());
-        }
-
-        private static Quaternionf orientationFromForward(Vec3 forward) {
-            return new Quaternionf().rotationTo(
-                    new Vector3f((float) forward.x, (float) forward.y, (float) forward.z),
-                    new Vector3f(0.0F, 0.0F, 1.0F));
         }
 
         private static Quaternionf spotlightOrientation(
@@ -554,43 +614,6 @@ public final class VeilColoredLightManager {
             return orientation;
         }
 
-        private static float linearChannel(int channel) {
-            float srgb = (channel & 0xFF) / 255.0F;
-            return srgb <= 0.04045F
-                    ? srgb / 12.92F
-                    : (float) Math.pow((srgb + 0.055F) / 1.055F, 2.4);
-        }
-
-        private static float[] adjustedColor(int color, ColoredLightRenderConfig config) {
-            float red = linearChannel(color >> 16);
-            float green = linearChannel(color >> 8);
-            float blue = linearChannel(color);
-            float luminance = red * 0.2126F + green * 0.7152F + blue * 0.0722F;
-            float saturation = config != null ? (float) config.colorSaturation : 1.0F;
-            red = luminance + (red - luminance) * saturation;
-            green = luminance + (green - luminance) * saturation;
-            blue = luminance + (blue - luminance) * saturation;
-            float strength = config != null ? (float) config.colorStrength : 1.0F;
-            float neutral = config != null ? (float) config.neutralLift : 0.0F;
-            return new float[]{
-                    Math.max(0.0F, red * strength + neutral),
-                    Math.max(0.0F, green * strength + neutral),
-                    Math.max(0.0F, blue * strength + neutral)
-            };
-        }
-
-        // L?YM!'s color settings tune its own lamps and stack with VILC's global light-pass settings.
-        // Defaults are neutral, so lamps look the same until the player changes them.
-        private static ColoredLightRenderConfig activeRenderConfig() {
-            ColoredLightRenderConfig renderConfig = ColoredLightRenderConfig.get();
-            renderConfig.clamp();
-            return renderConfig;
-        }
-
-        private static float exposure(ColoredLightRenderConfig renderConfig) {
-            return renderConfig != null ? (float) renderConfig.exposure : 1.0F;
-        }
-
         private boolean renderConfigChanged(ColoredLightRenderConfig renderConfig) {
             if (renderConfig == null) {
                 return yesMennRenderConfigActive;
@@ -635,6 +658,9 @@ public final class VeilColoredLightManager {
             spotlightSize = -1;
             spotlightSoftness = -1;
             spotlightFocus = -1;
+            flicker = -1;
+            glow = -1;
+            baseBrightness = 0.0F;
             exposure = Double.NaN;
             colorStrength = Double.NaN;
             colorSaturation = Double.NaN;
@@ -649,25 +675,6 @@ public final class VeilColoredLightManager {
             POINT,
             PANEL,
             SPOTLIGHT
-        }
-
-        private static final class SpotShapeBridge {
-            private static final MethodHandle SET = find("set",
-                    MethodType.methodType(void.class, SpotLightData.class, float.class, float.class));
-            private static final MethodHandle CLEAR = find("clear",
-                    MethodType.methodType(void.class, SpotLightData.class));
-
-            private static MethodHandle find(String name, MethodType type) {
-                if (!OptionalModCompat.vilcAvailable()) {
-                    return null;
-                }
-                try {
-                    Class<?> registry = Class.forName("com.yesmenn.veilirislights.compat.light.AreaLightShapeRegistry");
-                    return MethodHandles.publicLookup().findStatic(registry, name, type);
-                } catch (ReflectiveOperationException | LinkageError ignored) {
-                    return null;
-                }
-            }
         }
 
         private record AreaTransform(Vec3 position, Vec3 forward, Quaternionf orientation) {

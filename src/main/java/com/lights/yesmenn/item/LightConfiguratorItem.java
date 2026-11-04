@@ -97,7 +97,7 @@ public class LightConfiguratorItem extends Item {
                     .withStyle(ChatFormatting.GRAY));
             return;
         }
-        CompoundTag tag = customData(stack).copyTag();
+        CompoundTag tag = customData(stack).getUnsafe();
         tooltipComponents.add(Component.translatable(
                         "tooltip.lightsyesmenn.light_configurator.config",
                         tag.getInt(RADIUS),
@@ -136,7 +136,7 @@ public class LightConfiguratorItem extends Item {
     }
 
     private static boolean hasConfig(ItemStack stack) {
-        return customData(stack).copyTag().getBoolean(HAS_CONFIG);
+        return customData(stack).getUnsafe().getBoolean(HAS_CONFIG);
     }
 
     private static CustomData customData(ItemStack stack) {

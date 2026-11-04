@@ -13,6 +13,10 @@ public record ColoredLightActionPayload(BlockPos pos, int action, int value) imp
     public static final int SET_CONFIG = 2;
     public static final int SET_SPOTLIGHT_CONFIG = 3;
     public static final int SET_BRIGHTNESS = 4;
+    public static final int SET_FLICKER = 5;
+    public static final int SET_GLOW = 6;
+    public static final int SET_WARMUP = 7;
+    public static final int SET_WARMUP_TINT = 8;
     public static final Type<ColoredLightActionPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "colored_light_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, ColoredLightActionPayload> STREAM_CODEC =
@@ -28,14 +32,15 @@ public record ColoredLightActionPayload(BlockPos pos, int action, int value) imp
         return new ColoredLightActionPayload(buffer.readBlockPos(), buffer.readVarInt(), buffer.readVarInt());
     }
 
+    // Bits 0-23 color, 24-30 radius - 1 (1-128), 31 redstone inverted. Radius used to have 5 bits (max 32).
     public static int packConfig(int radius, int color, boolean redstoneInverted) {
-        return ((radius - 1) & 0x1F) << 24
-                | (redstoneInverted ? 1 << 29 : 0)
+        return ((Math.max(1, Math.min(128, radius)) - 1) & 0x7F) << 24
+                | (redstoneInverted ? 1 << 31 : 0)
                 | color & 0xFFFFFF;
     }
 
     public static int unpackRadius(int config) {
-        return (config >>> 24 & 0x1F) + 1;
+        return (config >>> 24 & 0x7F) + 1;
     }
 
     public static int unpackColor(int config) {
@@ -43,7 +48,7 @@ public record ColoredLightActionPayload(BlockPos pos, int action, int value) imp
     }
 
     public static boolean unpackRedstoneInverted(int config) {
-        return (config & 1 << 29) != 0;
+        return (config & 1 << 31) != 0;
     }
 
     public static int packSpotlightConfig(int angle, int brightness, int yaw, int pitch) {

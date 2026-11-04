@@ -46,7 +46,7 @@ authors="xcruell, YesMenn!"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Standalone colored lights from YesMenn!, including colored blocks, tubes, panels, spotlights, invisible spotlights, live configuration, and Veil-powered rendering.
+Standalone colored lights from YesMenn!, including colored blocks, tubes, panels, spotlights, invisible spotlights, a colorful flashlight, live configuration, and Veil-powered rendering.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
@@ -104,7 +104,7 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="veil_iris_lights"
     type="optional"
-    reason="L?YM! spotlights are Veil spot lights; VILC renders them with Iris from version 1.5.2 on."
-    versionRange="[1.5.2,)"
+    reason="L?YM! spotlights are Veil spot lights; VILC renders them with Iris from version 1.6.0 on."
+    versionRange="[1.6.0,)"
     ordering="NONE"
     side="CLIENT"

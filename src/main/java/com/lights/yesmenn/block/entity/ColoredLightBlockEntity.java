@@ -33,7 +33,14 @@ public class ColoredLightBlockEntity extends BlockEntity {
     public static final int DEFAULT_SPOTLIGHT_SIZE = 18;
     public static final int DEFAULT_SPOTLIGHT_SOFTNESS = 8;
     public static final int DEFAULT_SPOTLIGHT_FOCUS = 100;
+    public static final int DEFAULT_FLICKER = 0;
+    public static final int DEFAULT_GLOW = 0;
+    /** Warm-up time in tenths of a second (hanging lamp only), like an HQL lamp slowly reaching full brightness. */
+    public static final int DEFAULT_WARMUP = 30;
+    public static final int MAX_WARMUP = 100;
     private int color = DEFAULT_COLOR;
+    /** Light radius/range in blocks; 0 = not set yet, use the legacy block state value. */
+    private int radius;
     private int brightness = DEFAULT_BRIGHTNESS;
     private int spotlightAngle = DEFAULT_SPOTLIGHT_ANGLE;
     private int spotlightBrightness = DEFAULT_SPOTLIGHT_BRIGHTNESS;
@@ -42,6 +49,13 @@ public class ColoredLightBlockEntity extends BlockEntity {
     private int spotlightSize = DEFAULT_SPOTLIGHT_SIZE;
     private int spotlightSoftness = DEFAULT_SPOTLIGHT_SOFTNESS;
     private int spotlightFocus = DEFAULT_SPOTLIGHT_FOCUS;
+    /** 0-100: gentle bulb-like brightness flicker. */
+    private int flicker = DEFAULT_FLICKER;
+    /** 0-100: visible light beam in the air (Veil in-scattering, rendered by VILC). */
+    private int glow = DEFAULT_GLOW;
+    private int warmup = DEFAULT_WARMUP;
+    /** Index into HangingLampBlock.WARMUP_TINTS; 0 = no warm-up color. */
+    private int warmupTint;
 
     public ColoredLightBlockEntity(BlockPos pos, BlockState state) {
         this(ColoredLightCompatRegistry.COLORED_LIGHT_ENTITY.get(), pos, state);
@@ -56,7 +70,11 @@ public class ColoredLightBlockEntity extends BlockEntity {
     }
 
     public int getRadius() {
-        return getBlockState().getValue(ColoredLightBlock.RADIUS);
+        return radius > 0 ? radius : getBlockState().getValue(ColoredLightBlock.RADIUS);
+    }
+
+    private int clampRadius(int value) {
+        return Math.max(1, Math.min(ColoredLightBlock.maxRadius(getBlockState()), value));
     }
 
     public boolean isRedstoneInverted() {
@@ -95,6 +113,58 @@ public class ColoredLightBlockEntity extends BlockEntity {
         return spotlightFocus;
     }
 
+    public int getFlicker() {
+        return flicker;
+    }
+
+    public int getGlow() {
+        return glow;
+    }
+
+    public void setFlicker(int flicker) {
+        int next = Math.max(0, Math.min(100, flicker));
+        if (this.flicker == next) {
+            return;
+        }
+        this.flicker = next;
+        markUpdated();
+    }
+
+    public int getWarmup() {
+        return warmup;
+    }
+
+    public int getWarmupTint() {
+        return warmupTint;
+    }
+
+    public void setWarmupTint(int warmupTint) {
+        int next = Math.floorMod(warmupTint, com.lights.yesmenn.block.HangingLampBlock.WARMUP_TINTS.length);
+        if (this.warmupTint == next) {
+            return;
+        }
+        this.warmupTint = next;
+        markUpdated();
+    }
+
+    public void setWarmup(int warmup) {
+        int next = Math.max(0, Math.min(MAX_WARMUP, warmup));
+        if (this.warmup == next) {
+            return;
+        }
+        this.warmup = next;
+        markUpdated();
+    }
+
+    public void setGlow(int glow) {
+        int next = Math.max(0, Math.min(100, glow));
+        if (this.glow == next) {
+            return;
+        }
+        this.glow = next;
+        markUpdated();
+    }
+
     public void setColor(int color) {
         int nextColor = color & 0xFFFFFF;
         if (this.color == nextColor) {
@@ -109,13 +179,13 @@ public class ColoredLightBlockEntity extends BlockEntity {
             return;
         }
 
-        int clamped = Math.max(1, Math.min(32, radius));
-        BlockState state = getBlockState();
-        if (state.getValue(ColoredLightBlock.RADIUS) == clamped) {
+        int clamped = clampRadius(radius);
+        if (getRadius() == clamped && this.radius > 0) {
             return;
         }
-        level.setBlock(worldPosition, state.setValue(ColoredLightBlock.RADIUS, clamped), Block.UPDATE_CLIENTS);
-        setChanged();
+        this.radius = clamped;
+        refreshSpawnProtection();
+        markUpdated();
     }
 
     public void setBrightness(int brightness) {
@@ -136,10 +206,10 @@ public class ColoredLightBlockEntity extends BlockEntity {
             return;
         }
 
-        int clampedRadius = Math.max(1, Math.min(32, radius));
+        int clampedRadius = clampRadius(radius);
         int nextColor = color & 0xFFFFFF;
         BlockState state = getBlockState();
-        boolean radiusChanged = state.getValue(ColoredLightBlock.RADIUS) != clampedRadius;
+        boolean radiusChanged = getRadius() != clampedRadius || this.radius <= 0;
         boolean colorChanged = this.color != nextColor;
         boolean redstoneChanged = state.getValue(ColoredLightBlock.REDSTONE_INVERTED) != redstoneInverted;
         if (!radiusChanged && !colorChanged && !redstoneChanged) {
@@ -147,11 +217,12 @@ public class ColoredLightBlockEntity extends BlockEntity {
         }
 
         this.color = nextColor;
-        if (radiusChanged || redstoneChanged) {
+        this.radius = clampedRadius;
+        refreshSpawnProtection();
+        if (redstoneChanged) {
             level.setBlock(
                     worldPosition,
-                    state.setValue(ColoredLightBlock.RADIUS, clampedRadius)
-                            .setValue(ColoredLightBlock.REDSTONE_INVERTED, redstoneInverted),
+                    state.setValue(ColoredLightBlock.REDSTONE_INVERTED, redstoneInverted),
                     Block.UPDATE_CLIENTS);
         }
         markUpdated();
@@ -171,7 +242,11 @@ public class ColoredLightBlockEntity extends BlockEntity {
                 spotlightPitch,
                 spotlightSize,
                 spotlightSoftness,
-                spotlightFocus);
+                spotlightFocus,
+                flicker,
+                glow,
+                warmup,
+                warmupTint);
     }
 
     public void setSpotlightConfig(int angle, int brightness, int yaw, int pitch) {
@@ -179,7 +254,8 @@ public class ColoredLightBlockEntity extends BlockEntity {
     }
 
     public void setSpotlightConfig(int angle, int brightness, int yaw, int pitch, int size, int softness, int focus) {
-        int nextAngle = Math.max(5, Math.min(75, angle));
+        int nextAngle = Math.max(5, Math.min(
+                com.lights.yesmenn.block.HangingLampBlock.maxSpotlightAngle(getBlockState()), angle));
         int nextBrightness = Math.max(25, Math.min(800, brightness));
         int nextYaw = Math.max(-180, Math.min(180, yaw));
         int nextPitch = Math.max(-90, Math.min(90, pitch));
@@ -228,6 +304,8 @@ public class ColoredLightBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         int previousColor = color;
         color = tag.contains("Color") ? tag.getInt("Color") & 0xFFFFFF : DEFAULT_COLOR;
+        // Lights saved before the radius moved into the block entity keep their block state radius.
+        radius = tag.contains("Radius") ? Math.max(0, tag.getInt("Radius")) : 0;
         spotlightAngle = tag.contains("SpotlightAngle") ? tag.getInt("SpotlightAngle") : DEFAULT_SPOTLIGHT_ANGLE;
         spotlightBrightness = tag.contains("SpotlightBrightness")
                 ? tag.getInt("SpotlightBrightness")
@@ -244,6 +322,10 @@ public class ColoredLightBlockEntity extends BlockEntity {
                 ? tag.getInt("SpotlightSoftness")
                 : DEFAULT_SPOTLIGHT_SOFTNESS;
         spotlightFocus = tag.contains("SpotlightFocus") ? tag.getInt("SpotlightFocus") : DEFAULT_SPOTLIGHT_FOCUS;
+        flicker = Math.max(0, Math.min(100, tag.contains("Flicker") ? tag.getInt("Flicker") : DEFAULT_FLICKER));
+        glow = Math.max(0, Math.min(100, tag.contains("Glow") ? tag.getInt("Glow") : DEFAULT_GLOW));
+        warmup = Math.max(0, Math.min(MAX_WARMUP, tag.contains("Warmup") ? tag.getInt("Warmup") : DEFAULT_WARMUP));
+        warmupTint = Math.floorMod(tag.getInt("WarmupTint"), com.lights.yesmenn.block.HangingLampBlock.WARMUP_TINTS.length);
         if (color != previousColor) {
             // Only a color change affects the baked block tint; other updates must not rebuild the chunk section.
             invokeClientRenderHook();
@@ -254,6 +336,9 @@ public class ColoredLightBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt("Color", color);
+        if (radius > 0) {
+            tag.putInt("Radius", radius);
+        }
         tag.putInt("Brightness", brightness);
         tag.putInt("SpotlightAngle", spotlightAngle);
         tag.putInt("SpotlightBrightness", spotlightBrightness);
@@ -262,6 +347,10 @@ public class ColoredLightBlockEntity extends BlockEntity {
         tag.putInt("SpotlightSize", spotlightSize);
         tag.putInt("SpotlightSoftness", spotlightSoftness);
         tag.putInt("SpotlightFocus", spotlightFocus);
+        tag.putInt("Flicker", flicker);
+        tag.putInt("Glow", glow);
+        tag.putInt("Warmup", warmup);
+        tag.putInt("WarmupTint", warmupTint);
     }
 
     @Override
@@ -273,6 +362,12 @@ public class ColoredLightBlockEntity extends BlockEntity {
     @Override
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    private void refreshSpawnProtection() {
+        if (level instanceof ServerLevel serverLevel) {
+            FakeColoredLightManager.refresh(serverLevel, this);
+        }
     }
 
     private void markUpdated() {

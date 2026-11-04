@@ -20,7 +20,11 @@ public record OpenColoredLightScreenPayload(
         int spotlightPitch,
         int spotlightSize,
         int spotlightSoftness,
-        int spotlightFocus) implements CustomPacketPayload {
+        int spotlightFocus,
+        int flicker,
+        int glow,
+        int warmup,
+        int warmupTint) implements CustomPacketPayload {
     public static final Type<OpenColoredLightScreenPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(LightsYesMenn.MODID, "open_colored_light_screen"));
     public static final StreamCodec<RegistryFriendlyByteBuf, OpenColoredLightScreenPayload> STREAM_CODEC =
@@ -40,6 +44,10 @@ public record OpenColoredLightScreenPayload(
         buffer.writeVarInt(spotlightSize);
         buffer.writeVarInt(spotlightSoftness);
         buffer.writeVarInt(spotlightFocus);
+        buffer.writeVarInt(flicker);
+        buffer.writeVarInt(glow);
+        buffer.writeVarInt(warmup);
+        buffer.writeVarInt(warmupTint);
     }
 
     private static OpenColoredLightScreenPayload decode(RegistryFriendlyByteBuf buffer) {
@@ -50,6 +58,10 @@ public record OpenColoredLightScreenPayload(
                 buffer.readVarInt(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
