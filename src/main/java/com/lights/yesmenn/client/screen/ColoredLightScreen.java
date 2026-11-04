@@ -2,11 +2,16 @@ package com.lights.yesmenn.client.screen;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.lights.yesmenn.LightsYesMenn;
+import com.lights.yesmenn.block.ColoredLightBlock;
 import com.lights.yesmenn.block.ColoredLightSpotlightBlock;
+import com.lights.yesmenn.block.HangingLampBlock;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
 import com.lights.yesmenn.client.ColoredLightPresetStore;
+import com.lights.yesmenn.item.ColorfulFlashlightItem;
+import com.lights.yesmenn.item.FlashlightSettings;
 import com.lights.yesmenn.network.ColoredLightActionPayload;
 import com.lights.yesmenn.network.ColoredLightSpotlightPayload;
+import com.lights.yesmenn.network.FlashlightConfigPayload;
 import com.lights.yesmenn.network.OpenColoredLightScreenPayload;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -22,6 +27,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -37,6 +44,8 @@ public class ColoredLightScreen extends Screen {
     private static final int HUE_WIDTH = 180;
     private static final int HUE_HEIGHT = 18;
     private static final int PICKER_Y_OFFSET = 108;
+    /** Top of the effects card (flicker / light beam) below the preview card. */
+    private static final int EFFECTS_Y = 368;
     private static final Preset[] BUILT_IN_PRESETS = {
             new Preset("gui.lightsyesmenn.light.preset.warm", 0xFFB05C),
             new Preset("gui.lightsyesmenn.light.preset.white", 0xFFFFFF),
@@ -46,7 +55,15 @@ public class ColoredLightScreen extends Screen {
             new Preset("gui.lightsyesmenn.light.preset.purple", 0xC050FF)
     };
 
+    /** Target lamp, or null when the screen edits a held flashlight. */
     private final BlockPos pos;
+    /** Hand holding the edited flashlight, or null when the screen edits a lamp. */
+    private final InteractionHand flashlightHand;
+    private final boolean flashlight;
+    /** Hanging lamps always point down: no yaw/pitch, but a much wider cone. */
+    private final boolean hangingLamp;
+    /** Largest radius/range of the edited light (lamps 64, spotlights and flashlight 128). */
+    private final int maxRadius;
     private final List<Button> customPresetButtons = new ArrayList<>();
     private final boolean spotlight;
     private int radius;
@@ -61,6 +78,20 @@ public class ColoredLightScreen extends Screen {
     private int spotlightSize;
     private int spotlightSoftness;
     private int spotlightFocus;
+    private int flicker;
+    private int glow;
+    /** Hanging lamp warm-up in tenths of a second. */
+    private int warmup = ColoredLightBlockEntity.DEFAULT_WARMUP;
+    private int savedWarmup = ColoredLightBlockEntity.DEFAULT_WARMUP;
+    /** Hanging lamp warm-up color, index into HangingLampBlock.WARMUP_TINTS (0 = off). */
+    private int warmupTint;
+    private int savedWarmupTint;
+    /** Flashlight only: brightness of the wide spill cone around the core (0-100). */
+    private int spill;
+    /** Flashlight only: chromatic fringe at the beam edge (0-100). */
+    private int fringe;
+    private int savedFlicker;
+    private int savedGlow;
     private int pickerHue;
     private boolean redstoneInverted;
     private boolean savedRedstoneInverted;
@@ -96,6 +127,11 @@ public class ColoredLightScreen extends Screen {
     private IntSlider spotlightSizeSlider;
     private IntSlider spotlightSoftnessSlider;
     private IntSlider spotlightFocusSlider;
+    private IntSlider flickerSlider;
+    private IntSlider glowSlider;
+    private IntSlider warmupSlider;
+    private IntSlider spillSlider;
+    private IntSlider fringeSlider;
     private Button colorModeButton;
     private Button redstoneModeButton;
     private DynamicTexture pickerTexture;
@@ -105,24 +141,65 @@ public class ColoredLightScreen extends Screen {
     private ResourceLocation hueTextureId;
 
     public ColoredLightScreen(OpenColoredLightScreenPayload payload) {
-        super(Component.translatable("screen.lightsyesmenn.colored_light"));
-        pos = payload.pos();
-        spotlight = payload.spotlight();
-        radius = payload.radius();
-        red = payload.color() >> 16 & 0xFF;
-        green = payload.color() >> 8 & 0xFF;
-        blue = payload.color() & 0xFF;
-        brightness = payload.brightness();
-        temperature = nearestTemperature(payload.color());
-        spotlightAngle = payload.spotlightAngle();
-        spotlightYaw = payload.spotlightYaw();
-        spotlightPitch = payload.spotlightPitch();
-        spotlightSize = payload.spotlightSize();
-        spotlightSoftness = payload.spotlightSoftness();
-        spotlightFocus = payload.spotlightFocus();
-        pickerHue = hueFromColor(payload.color());
-        redstoneInverted = payload.redstoneInverted();
+        this(Component.translatable("screen.lightsyesmenn.colored_light"), payload.pos(), null, payload.spotlight(),
+                payload.radius(), payload.color(), payload.brightness(), payload.redstoneInverted(),
+                payload.spotlightAngle(), payload.spotlightYaw(), payload.spotlightPitch(),
+                payload.spotlightSize(), payload.spotlightSoftness(), payload.spotlightFocus(),
+                payload.flicker(), payload.glow(), 0, 0);
+        warmup = payload.warmup();
+        savedWarmup = warmup;
+        warmupTint = payload.warmupTint();
+        savedWarmupTint = warmupTint;
+    }
+
+    public ColoredLightScreen(InteractionHand hand, FlashlightSettings settings) {
+        this(Component.translatable("screen.lightsyesmenn.colorful_flashlight"), null, hand, true,
+                settings.range(), settings.color(), settings.brightness(), false,
+                settings.angle(), 0, 0, settings.size(), settings.softness(), settings.focus(),
+                settings.flicker(), settings.glow(), settings.spill(), settings.fringe());
+    }
+
+    private ColoredLightScreen(Component title, BlockPos pos, InteractionHand flashlightHand, boolean spotlight,
+                               int radius, int color, int brightness, boolean redstoneInverted,
+                               int spotlightAngle, int spotlightYaw, int spotlightPitch,
+                               int spotlightSize, int spotlightSoftness, int spotlightFocus,
+                               int flicker, int glow, int spill, int fringe) {
+        super(title);
+        this.pos = pos;
+        this.flashlightHand = flashlightHand;
+        this.flashlight = flashlightHand != null;
+        Minecraft minecraft = Minecraft.getInstance();
+        this.hangingLamp = pos != null && minecraft.level != null
+                && minecraft.level.getBlockState(pos).getBlock() instanceof HangingLampBlock;
+        this.maxRadius = flashlight
+                ? FlashlightSettings.MAX_RANGE
+                : pos != null && minecraft.level != null
+                ? ColoredLightBlock.maxRadius(minecraft.level.getBlockState(pos))
+                : ColoredLightBlock.MAX_LAMP_RADIUS;
+        this.spotlight = spotlight;
+        this.radius = radius;
+        red = color >> 16 & 0xFF;
+        green = color >> 8 & 0xFF;
+        blue = color & 0xFF;
+        this.brightness = brightness;
+        temperature = nearestTemperature(color);
+        this.spotlightAngle = spotlightAngle;
+        this.spotlightYaw = spotlightYaw;
+        this.spotlightPitch = spotlightPitch;
+        this.spotlightSize = spotlightSize;
+        this.spotlightSoftness = spotlightSoftness;
+        this.spotlightFocus = spotlightFocus;
+        this.flicker = flicker;
+        this.glow = glow;
+        this.spill = spill;
+        this.fringe = fringe;
+        savedFlicker = flicker;
+        savedGlow = glow;
+        pickerHue = hueFromColor(color);
+        this.redstoneInverted = redstoneInverted;
         savedRedstoneInverted = redstoneInverted;
+        savedFlicker = flicker;
+        savedGlow = glow;
         savedSpotlightAngle = spotlightAngle;
         savedSpotlightYaw = spotlightYaw;
         savedSpotlightPitch = spotlightPitch;
@@ -141,13 +218,13 @@ public class ColoredLightScreen extends Screen {
         int sliderWidth = panelWidth - 152;
         int fieldX = left + panelWidth - 58;
 
-        radiusBox = numberBox(fieldX, top + 52, 46, radius, 2);
+        radiusBox = numberBox(fieldX, top + 52, 46, radius, 3);
         brightnessBox = numberBox(fieldX, top + 78, 46, brightness, 3);
         redBox = numberBox(fieldX, top + 104, 46, red, 3);
         greenBox = numberBox(fieldX, top + 130, 46, green, 3);
         blueBox = numberBox(fieldX, top + 156, 46, blue, 3);
 
-        radiusSlider = slider(sliderX, top + 52, sliderWidth, 1, 32, radius, value -> {
+        radiusSlider = slider(sliderX, top + 52, sliderWidth, 1, maxRadius, radius, value -> {
             syncField(radiusBox, value);
             previewLightSettings(true);
         });
@@ -170,7 +247,7 @@ public class ColoredLightScreen extends Screen {
         temperatureSlider = slider(sliderX, top + 190, panelWidth - 96, MIN_TEMPERATURE, MAX_TEMPERATURE,
                 temperature, this::applyTemperature);
 
-        bindField(radiusBox, radiusSlider, 1, 32);
+        bindField(radiusBox, radiusSlider, 1, maxRadius);
         bindField(brightnessBox, brightnessSlider, 25, 800);
         bindField(redBox, redSlider, 0, 255);
         bindField(greenBox, greenSlider, 0, 255);
@@ -220,20 +297,36 @@ public class ColoredLightScreen extends Screen {
                 .bounds(left + panelWidth - 132, top + 286, 120, 20)
                 .build());
 
-        redstoneModeButton = addRenderableWidget(Button.builder(redstoneModeLabel(),
-                        button -> {
-                            redstoneInverted = !redstoneInverted;
-                            button.setMessage(redstoneModeLabel());
-                        })
-                .bounds(left + panelWidth - 172, top + 332, 160, 20)
-                .build());
+        if (!flashlight) {
+            redstoneModeButton = addRenderableWidget(Button.builder(redstoneModeLabel(),
+                            button -> {
+                                redstoneInverted = !redstoneInverted;
+                                button.setMessage(redstoneModeLabel());
+                            })
+                    .bounds(left + panelWidth - 172, top + 332, 160, 20)
+                    .build());
+        }
+
+        // Effects card: bulb flicker and visible light beam (in-scattering, rendered by VILC).
+        // Hanging lamps have no direction, so the effects take those rows of the spotlight panel instead.
+        if (!hangingLamp) {
+            flickerSlider = slider(sliderX, top + EFFECTS_Y + 8, panelWidth - 96, 0, 100, flicker, value -> {
+                flicker = value;
+                previewEffects();
+            });
+            glowSlider = slider(sliderX, top + EFFECTS_Y + 34, panelWidth - 96, 0, 100, glow, value -> {
+                glow = value;
+                previewEffects();
+            });
+        }
 
         int buttonY = top + layout.height() - 28;
         if (spotlight) {
             int spotLeft = layout.spotlightLeft();
             int spotSliderX = spotLeft + 106;
             int spotSliderWidth = layout.spotlightWidth() - 118;
-            spotlightAngleSlider = slider(spotSliderX, top + 44, spotSliderWidth, 5, 75,
+            spotlightAngleSlider = slider(spotSliderX, top + 44, spotSliderWidth, 5,
+                    hangingLamp ? HangingLampBlock.MAX_ANGLE : 75,
                     spotlightAngle, value -> {
                         spotlightAngle = value;
                         previewSpotlightSettings();
@@ -253,19 +346,55 @@ public class ColoredLightScreen extends Screen {
                         spotlightFocus = value;
                         previewSpotlightSettings();
                     });
-            spotlightYawSlider = snappingSlider(spotSliderX, top + 184, spotSliderWidth, -90, 90,
-                    spotlightYaw, value -> {
-                        spotlightYaw = value;
-                        previewSpotlightSettings();
-                    }, -90, -45, 0, 45, 90);
-            spotlightPitchSlider = snappingSlider(spotSliderX, top + 216, spotSliderWidth, -90, 90,
-                    spotlightPitch, value -> {
-                        spotlightPitch = value;
-                        previewSpotlightSettings();
-                    }, -90, -45, 0, 45, 90);
+            if (hangingLamp) {
+                // A hanging lamp always shines straight down; its direction rows hold the effects.
+                flickerSlider = slider(spotSliderX, top + 184, spotSliderWidth, 0, 100, flicker, value -> {
+                    flicker = value;
+                    previewEffects();
+                });
+                glowSlider = slider(spotSliderX, top + 216, spotSliderWidth, 0, 100, glow, value -> {
+                    glow = value;
+                    previewEffects();
+                });
+                warmupSlider = slider(spotSliderX, top + 248, spotSliderWidth, 0, ColoredLightBlockEntity.MAX_WARMUP,
+                        warmup, value -> {
+                            warmup = value;
+                            previewEffects();
+                        });
+                warmupSlider.setFormatter(value -> String.format(java.util.Locale.ROOT, "%.1f s", value / 10.0));
+                addRenderableWidget(Button.builder(warmupTintLabel(), button -> {
+                            warmupTint = (warmupTint + 1) % HangingLampBlock.WARMUP_TINTS.length;
+                            button.setMessage(warmupTintLabel());
+                            previewEffects();
+                        })
+                        .bounds(spotLeft + 12, top + 280, spotSliderX + spotSliderWidth - 92 - 8 - (spotLeft + 12), 20)
+                        .build());
+            } else if (!flashlight) {
+                // A flashlight always points where the player looks.
+                spotlightYawSlider = snappingSlider(spotSliderX, top + 184, spotSliderWidth, -90, 90,
+                        spotlightYaw, value -> {
+                            spotlightYaw = value;
+                            previewSpotlightSettings();
+                        }, -90, -45, 0, 45, 90);
+                spotlightPitchSlider = snappingSlider(spotSliderX, top + 216, spotSliderWidth, -90, 90,
+                        spotlightPitch, value -> {
+                            spotlightPitch = value;
+                            previewSpotlightSettings();
+                        }, -90, -45, 0, 45, 90);
+            } else {
+                // The flashlight has no yaw/pitch; those rows hold its spill cone and lens fringe instead.
+                spillSlider = slider(spotSliderX, top + 184, spotSliderWidth, 0, 100, spill, value -> {
+                    spill = value;
+                    previewSpotlightSettings();
+                });
+                fringeSlider = slider(spotSliderX, top + 216, spotSliderWidth, 0, 100, fringe, value -> {
+                    fringe = value;
+                    previewSpotlightSettings();
+                });
+            }
             addRenderableWidget(Button.builder(Component.translatable("gui.lightsyesmenn.light.spotlight_reset"),
                             button -> resetSpotlightSettings())
-                    .bounds(spotSliderX + spotSliderWidth - 92, top + 240, 92, 20)
+                    .bounds(spotSliderX + spotSliderWidth - 92, top + (hangingLamp ? 280 : 240), 92, 20)
                     .build());
         }
 
@@ -381,7 +510,12 @@ public class ColoredLightScreen extends Screen {
     }
 
     private void saveChanges() {
-        Integer nextRadius = parseIfValid(radiusBox, 1, 32);
+        if (flashlight) {
+            previewLightSettings(true);
+            flushLightSync(true);
+            return;
+        }
+        Integer nextRadius = parseIfValid(radiusBox, 1, maxRadius);
         Integer nextBrightness = parseIfValid(brightnessBox, 25, 800);
         Integer nextRed = parseIfValid(redBox, 0, 255);
         Integer nextGreen = parseIfValid(greenBox, 0, 255);
@@ -395,7 +529,11 @@ public class ColoredLightScreen extends Screen {
         boolean lightChanged = nextRadius != radius
                 || nextBrightness != brightness
                 || color != currentColor
-                || redstoneInverted != savedRedstoneInverted;
+                || redstoneInverted != savedRedstoneInverted
+                || flicker != savedFlicker
+                || glow != savedGlow
+                || warmup != savedWarmup
+                || warmupTint != savedWarmupTint;
         boolean spotlightChanged = spotlight
                 && (spotlightAngle != savedSpotlightAngle
                 || spotlightYaw != savedSpotlightYaw
@@ -421,6 +559,10 @@ public class ColoredLightScreen extends Screen {
                 && minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light) {
             light.setColor(color);
             light.setBrightness(brightness);
+            light.setFlicker(flicker);
+            light.setGlow(glow);
+            light.setWarmup(warmup);
+            light.setWarmupTint(warmupTint);
             if (spotlight) {
                 light.setSpotlightConfig(
                         spotlightAngle,
@@ -441,6 +583,7 @@ public class ColoredLightScreen extends Screen {
                     pos,
                     ColoredLightActionPayload.SET_BRIGHTNESS,
                     brightness));
+            sendEffects();
         }
         if (spotlightChanged) {
             PacketDistributor.sendToServer(new ColoredLightSpotlightPayload(
@@ -459,7 +602,7 @@ public class ColoredLightScreen extends Screen {
     }
 
     private void previewLightSettings(boolean sendToServer) {
-        Integer nextRadius = parseIfValid(radiusBox, 1, 32);
+        Integer nextRadius = parseIfValid(radiusBox, 1, maxRadius);
         Integer nextBrightness = parseIfValid(brightnessBox, 25, 800);
         Integer nextRed = parseIfValid(redBox, 0, 255);
         Integer nextGreen = parseIfValid(greenBox, 0, 255);
@@ -475,11 +618,15 @@ public class ColoredLightScreen extends Screen {
         green = nextGreen;
         blue = nextBlue;
 
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level != null
-                && minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light) {
-            light.setConfig(radius, color, redstoneInverted);
-            light.setBrightness(brightness);
+        if (flashlight) {
+            previewFlashlight();
+        } else {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.level != null
+                    && minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light) {
+                light.setConfig(radius, color, redstoneInverted);
+                light.setBrightness(brightness);
+            }
         }
         if (sendToServer) {
             // The client block entity already previews the change; the server only needs a throttled copy.
@@ -498,6 +645,10 @@ public class ColoredLightScreen extends Screen {
         }
         pendingLightSync = false;
         lastLightSyncMillis = now;
+        if (flashlight) {
+            PacketDistributor.sendToServer(new FlashlightConfigPayload(flashlightHand, currentFlashlightSettings()));
+            return;
+        }
         PacketDistributor.sendToServer(new ColoredLightActionPayload(
                 pos,
                 ColoredLightActionPayload.SET_CONFIG,
@@ -506,11 +657,52 @@ public class ColoredLightScreen extends Screen {
                 pos,
                 ColoredLightActionPayload.SET_BRIGHTNESS,
                 brightness));
+        sendEffects();
+        if (spotlight) {
+            PacketDistributor.sendToServer(new ColoredLightSpotlightPayload(
+                    pos,
+                    spotlightAngle,
+                    brightness,
+                    spotlightYaw,
+                    spotlightPitch,
+                    spotlightSize,
+                    spotlightSoftness,
+                    spotlightFocus));
+        }
+    }
+
+    private void sendEffects() {
+        PacketDistributor.sendToServer(new ColoredLightActionPayload(pos, ColoredLightActionPayload.SET_FLICKER, flicker));
+        PacketDistributor.sendToServer(new ColoredLightActionPayload(pos, ColoredLightActionPayload.SET_GLOW, glow));
+        if (hangingLamp) {
+            PacketDistributor.sendToServer(new ColoredLightActionPayload(pos, ColoredLightActionPayload.SET_WARMUP, warmup));
+            PacketDistributor.sendToServer(new ColoredLightActionPayload(
+                    pos, ColoredLightActionPayload.SET_WARMUP_TINT, warmupTint));
+        }
+    }
+
+    /** Applies flicker / light beam instantly on the client and queues a throttled server sync. */
+    private void previewEffects() {
+        if (flashlight) {
+            previewFlashlight();
+        } else {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.level != null
+                    && minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light) {
+                light.setFlicker(flicker);
+                light.setGlow(glow);
+                light.setWarmup(warmup);
+                light.setWarmupTint(warmupTint);
+            }
+        }
+        pendingLightSync = true;
+        flushLightSync(false);
     }
 
     @Override
     public void tick() {
         super.tick();
+        applyPreviewToBlockEntity();
         flushLightSync(false);
     }
 
@@ -518,9 +710,35 @@ public class ColoredLightScreen extends Screen {
         if (!spotlight) {
             return;
         }
+        if (flashlight) {
+            previewFlashlight();
+            pendingLightSync = true;
+            flushLightSync(false);
+            return;
+        }
+        applyPreviewToBlockEntity();
+        pendingLightSync = true;
+        flushLightSync(false);
+    }
+
+    /**
+     * Writes the screen's current values into the client block entity. Every server sync answers with the full
+     * block entity data, which can briefly carry older values (e.g. spotlight settings that were not sent yet) and
+     * used to make the light jump back; re-applying each tick keeps the preview stable.
+     */
+    private void applyPreviewToBlockEntity() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level != null
-                && minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light) {
+        if (flashlight || minecraft.level == null
+                || !(minecraft.level.getBlockEntity(pos) instanceof ColoredLightBlockEntity light)) {
+            return;
+        }
+        light.setConfig(radius, red << 16 | green << 8 | blue, redstoneInverted);
+        light.setBrightness(brightness);
+        light.setFlicker(flicker);
+        light.setGlow(glow);
+        light.setWarmup(warmup);
+        light.setWarmupTint(warmupTint);
+        if (spotlight) {
             light.setSpotlightConfig(
                     spotlightAngle,
                     brightness,
@@ -532,16 +750,57 @@ public class ColoredLightScreen extends Screen {
         }
     }
 
+    private Component warmupTintLabel() {
+        return Component.translatable("gui.lightsyesmenn.light.warmup_tint",
+                Component.translatable("gui.lightsyesmenn.light.warmup_tint." + warmupTint));
+    }
+
+    private FlashlightSettings currentFlashlightSettings() {
+        return new FlashlightSettings(radius, red << 16 | green << 8 | blue, brightness,
+                spotlightAngle, spotlightSize, spotlightSoftness, spotlightFocus, spill, glow, fringe, flicker);
+    }
+
+    /** Applies the settings to the client copy of the held flashlight so the beam updates instantly. */
+    private void previewFlashlight() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return;
+        }
+        ItemStack stack = minecraft.player.getItemInHand(flashlightHand);
+        if (stack.getItem() instanceof ColorfulFlashlightItem) {
+            currentFlashlightSettings().write(stack);
+        }
+    }
+
     private void resetSpotlightSettings() {
-        spotlightAngle = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_ANGLE;
-        spotlightYaw = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_YAW;
-        spotlightPitch = defaultSpotlightPitch();
-        spotlightSize = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_SIZE;
-        spotlightSoftness = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_SOFTNESS;
-        spotlightFocus = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_FOCUS;
+        if (flashlight) {
+            FlashlightSettings defaults = FlashlightSettings.DEFAULT;
+            spotlightAngle = defaults.angle();
+            spotlightSize = defaults.size();
+            spotlightSoftness = defaults.softness();
+            spotlightFocus = defaults.focus();
+            spill = defaults.spill();
+            fringe = defaults.fringe();
+            spillSlider.setIntValue(spill, false);
+            fringeSlider.setIntValue(fringe, false);
+        } else if (hangingLamp) {
+            spotlightAngle = HangingLampBlock.DEFAULT_ANGLE;
+            spotlightYaw = 0;
+            spotlightPitch = 0;
+            spotlightSize = HangingLampBlock.DEFAULT_SIZE;
+            spotlightSoftness = HangingLampBlock.DEFAULT_SOFTNESS;
+            spotlightFocus = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_FOCUS;
+        } else {
+            spotlightAngle = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_ANGLE;
+            spotlightYaw = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_YAW;
+            spotlightPitch = defaultSpotlightPitch();
+            spotlightSize = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_SIZE;
+            spotlightSoftness = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_SOFTNESS;
+            spotlightFocus = ColoredLightBlockEntity.DEFAULT_SPOTLIGHT_FOCUS;
+            spotlightYawSlider.setIntValue(spotlightYaw, false);
+            spotlightPitchSlider.setIntValue(spotlightPitch, false);
+        }
         spotlightAngleSlider.setIntValue(spotlightAngle, false);
-        spotlightYawSlider.setIntValue(spotlightYaw, false);
-        spotlightPitchSlider.setIntValue(spotlightPitch, false);
         spotlightSizeSlider.setIntValue(spotlightSize, false);
         spotlightSoftnessSlider.setIntValue(spotlightSoftness, false);
         spotlightFocusSlider.setIntValue(spotlightFocus, false);
@@ -609,13 +868,20 @@ public class ColoredLightScreen extends Screen {
             temperatureSlider.step(direction * (shifted ? 500 : 100));
             return true;
         }
+        if (adjustHovered(mouseX, mouseY, null, flickerSlider, direction * (shifted ? 10 : 1))
+                || adjustHovered(mouseX, mouseY, null, glowSlider, direction * (shifted ? 10 : 1))
+                || adjustHovered(mouseX, mouseY, null, warmupSlider, direction * (shifted ? 10 : 1))) {
+            return true;
+        }
         if (spotlight
                 && (adjustHovered(mouseX, mouseY, null, spotlightAngleSlider, direction * (shifted ? 5 : 1))
                 || adjustHovered(mouseX, mouseY, null, spotlightSizeSlider, direction * (shifted ? 5 : 1))
                 || adjustHovered(mouseX, mouseY, null, spotlightSoftnessSlider, direction * (shifted ? 5 : 1))
                 || adjustHovered(mouseX, mouseY, null, spotlightFocusSlider, direction * (shifted ? 25 : 5))
                 || adjustHovered(mouseX, mouseY, null, spotlightYawSlider, direction * (shifted ? 15 : 1))
-                || adjustHovered(mouseX, mouseY, null, spotlightPitchSlider, direction * (shifted ? 15 : 1)))) {
+                || adjustHovered(mouseX, mouseY, null, spotlightPitchSlider, direction * (shifted ? 15 : 1))
+                || adjustHovered(mouseX, mouseY, null, spillSlider, direction * (shifted ? 10 : 1))
+                || adjustHovered(mouseX, mouseY, null, fringeSlider, direction * (shifted ? 10 : 1)))) {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -695,6 +961,9 @@ public class ColoredLightScreen extends Screen {
     }
 
     private boolean adjustHovered(double mouseX, double mouseY, EditBox box, IntSlider slider, int delta) {
+        if (slider == null) {
+            return false;
+        }
         if ((box == null || !box.isMouseOver(mouseX, mouseY)) && !slider.isMouseOver(mouseX, mouseY)) {
             return false;
         }
@@ -709,12 +978,21 @@ public class ColoredLightScreen extends Screen {
                 || greenSlider.isMouseOver(mouseX, mouseY)
                 || blueSlider.isMouseOver(mouseX, mouseY)
                 || temperatureSlider.isMouseOver(mouseX, mouseY)
+                || flickerSlider.isMouseOver(mouseX, mouseY)
+                || glowSlider.isMouseOver(mouseX, mouseY)
+                || isMouseOver(warmupSlider, mouseX, mouseY)
                 || spotlight && (spotlightAngleSlider.isMouseOver(mouseX, mouseY)
                 || spotlightSizeSlider.isMouseOver(mouseX, mouseY)
                 || spotlightSoftnessSlider.isMouseOver(mouseX, mouseY)
                 || spotlightFocusSlider.isMouseOver(mouseX, mouseY)
-                || spotlightYawSlider.isMouseOver(mouseX, mouseY)
-                || spotlightPitchSlider.isMouseOver(mouseX, mouseY));
+                || isMouseOver(spotlightYawSlider, mouseX, mouseY)
+                || isMouseOver(spotlightPitchSlider, mouseX, mouseY)
+                || isMouseOver(spillSlider, mouseX, mouseY)
+                || isMouseOver(fringeSlider, mouseX, mouseY));
+    }
+
+    private static boolean isMouseOver(IntSlider slider, double mouseX, double mouseY) {
+        return slider != null && slider.isMouseOver(mouseX, mouseY);
     }
 
     private void updateWidgetAlpha() {
@@ -757,9 +1035,13 @@ public class ColoredLightScreen extends Screen {
         drawCard(guiGraphics, left + 8, top + 228, panelWidth - 16, 38, cardAlpha << 24 | 0x30C060, cardAlpha);
         drawCard(guiGraphics, left + 8, top + 272, panelWidth - 16, 38, cardAlpha << 24 | 0x30C060, cardAlpha);
         drawCard(guiGraphics, left + 8, top + 318, panelWidth - 16, 44, accent, cardAlpha);
+        if (!hangingLamp) {
+            drawCard(guiGraphics, left + 8, top + EFFECTS_Y, panelWidth - 16, 60, accent, cardAlpha);
+        }
         if (spotlight) {
             guiGraphics.fill(layout.spotlightLeft(), top, layout.spotlightLeft() + layout.spotlightWidth(), top + layout.height(), alpha << 24 | 0x101010);
-            drawCard(guiGraphics, layout.spotlightLeft() + 8, top + 32, layout.spotlightWidth() - 16, 236, accent, cardAlpha);
+            drawCard(guiGraphics, layout.spotlightLeft() + 8, top + 32, layout.spotlightWidth() - 16,
+                    hangingLamp ? 276 : 236, accent, cardAlpha);
         }
         if (sliderDragging) {
             setNumberBoxesVisible(false);
@@ -774,7 +1056,9 @@ public class ColoredLightScreen extends Screen {
         int labelColor = withAlpha(0xE0E0E0);
         int mutedColor = withAlpha(0xC0C0C0);
         guiGraphics.drawCenteredString(font, title, left + panelWidth / 2, top + 14, textColor);
-        guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.radius"), left + 12, top + 58, labelColor);
+        guiGraphics.drawString(font, Component.translatable(flashlight
+                ? "gui.lightsyesmenn.light.range"
+                : "gui.lightsyesmenn.light.radius"), left + 12, top + 58, labelColor);
         guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.brightness"), left + 12, top + 84, labelColor);
         if (colorPickerMode) {
             renderColorPicker(guiGraphics, left, top, layout.mainWidth());
@@ -786,6 +1070,13 @@ public class ColoredLightScreen extends Screen {
         }
         guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.presets"), left + 12, top + 228, mutedColor);
         guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.custom_presets"), left + 12, top + 272, mutedColor);
+
+        if (!hangingLamp) {
+            guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.flicker"),
+                    left + 12, top + EFFECTS_Y + 14, labelColor);
+            guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.glow"),
+                    left + 12, top + EFFECTS_Y + 40, labelColor);
+        }
 
         int previewColor = (sliderDragging ? 0x40 : 0xFF) << 24 | currentColor();
         guiGraphics.fill(left + 12, top + 334, left + 172, top + 356, previewColor);
@@ -805,11 +1096,26 @@ public class ColoredLightScreen extends Screen {
                     spotLeft + 12, top + 114, labelColor);
             guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.spotlight_focus"),
                     spotLeft + 12, top + 146, labelColor);
-            guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.spotlight_yaw"),
-                    spotLeft + 12, top + 190, labelColor);
-            guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.spotlight_pitch"),
-                    spotLeft + 12, top + 222, labelColor);
-            renderBeamPreview(guiGraphics, spotLeft + 18, top + 300, layout.spotlightWidth() - 36, 84);
+            if (hangingLamp) {
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.flicker"),
+                        spotLeft + 12, top + 190, labelColor);
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.glow"),
+                        spotLeft + 12, top + 222, labelColor);
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.warmup"),
+                        spotLeft + 12, top + 254, labelColor);
+            } else if (!flashlight) {
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.spotlight_yaw"),
+                        spotLeft + 12, top + 190, labelColor);
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.spotlight_pitch"),
+                        spotLeft + 12, top + 222, labelColor);
+            } else {
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.flashlight_spill"),
+                        spotLeft + 12, top + 190, labelColor);
+                guiGraphics.drawString(font, Component.translatable("gui.lightsyesmenn.light.flashlight_fringe"),
+                        spotLeft + 12, top + 222, labelColor);
+            }
+            renderBeamPreview(guiGraphics, spotLeft + 18, top + (hangingLamp ? 334 : 300),
+                    layout.spotlightWidth() - 36, 84);
         }
     }
 
@@ -960,7 +1266,8 @@ public class ColoredLightScreen extends Screen {
         if (spotlight && totalWidth < mainWidth + gap + spotlightWidth) {
             spotlightWidth = Math.max(260, totalWidth - mainWidth - gap);
         }
-        int height = spotlight ? 430 : 410;
+        // Without the effects card (moved into the spotlight panel) the hanging lamp's main panel is shorter.
+        int height = hangingLamp ? 432 : spotlight ? 466 : 462;
         int left = (width - (mainWidth + gap + spotlightWidth)) / 2;
         int top = Math.max(8, (this.height - height) / 2);
         return new Layout(left, top, height, mainWidth, gap, spotlightWidth);
@@ -1218,13 +1525,20 @@ public class ColoredLightScreen extends Screen {
             }
         }
 
+        private java.util.function.IntFunction<String> formatter = Integer::toString;
+
+        private void setFormatter(java.util.function.IntFunction<String> formatter) {
+            this.formatter = formatter;
+            updateMessage();
+        }
+
         private void step(int delta) {
             setIntValue(intValue + delta, true);
         }
 
         @Override
         protected void updateMessage() {
-            setMessage(Component.literal(Integer.toString(intValue)));
+            setMessage(Component.literal(formatter != null ? formatter.apply(intValue) : Integer.toString(intValue)));
         }
 
         @Override

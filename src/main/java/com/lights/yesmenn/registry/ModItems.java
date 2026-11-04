@@ -1,6 +1,7 @@
 package com.lights.yesmenn.registry;
 
 import com.lights.yesmenn.LightsYesMenn;
+import com.lights.yesmenn.item.ColorfulFlashlightItem;
 import com.lights.yesmenn.item.LightConfiguratorItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -11,6 +12,9 @@ public final class ModItems {
 
     public static final DeferredItem<LightConfiguratorItem> LIGHT_CONFIGURATOR =
             ITEMS.register("light_configurator", () -> new LightConfiguratorItem(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<ColorfulFlashlightItem> COLORFUL_FLASHLIGHT =
+            ITEMS.register("colorful_flashlight", () -> new ColorfulFlashlightItem(new Item.Properties().stacksTo(1)));
 
     private ModItems() {
     }

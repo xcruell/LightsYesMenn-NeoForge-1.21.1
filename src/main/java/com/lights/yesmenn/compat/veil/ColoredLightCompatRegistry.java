@@ -5,6 +5,7 @@ import com.lights.yesmenn.block.ColoredLightBlock;
 import com.lights.yesmenn.block.ColoredLightPanelBlock;
 import com.lights.yesmenn.block.ColoredLightSpotlightBlock;
 import com.lights.yesmenn.block.ColoredLightTubeBlock;
+import com.lights.yesmenn.block.HangingLampBlock;
 import com.lights.yesmenn.block.InvisibleColoredLightSpotlightBlock;
 import com.lights.yesmenn.block.InvisibleColoredPointLightBlock;
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
@@ -87,6 +88,18 @@ public final class ColoredLightCompatRegistry {
             ITEMS.register("colored_light_spotlight_big",
                     () -> new BlockItem(COLORED_LIGHT_SPOTLIGHT_BIG.get(), new Item.Properties()));
 
+    public static final DeferredBlock<HangingLampBlock> HANGING_LAMP =
+            BLOCKS.register("hanging_lamp",
+                    () -> new HangingLampBlock(
+                            BlockBehaviour.Properties.of()
+                                    .strength(1.5F, 6.0F)
+                                    .sound(SoundType.LANTERN)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> HANGING_LAMP_ITEM =
+            ITEMS.register("hanging_lamp",
+                    () -> new BlockItem(HANGING_LAMP.get(), new Item.Properties()));
+
     public static final DeferredBlock<InvisibleColoredLightSpotlightBlock> INVISIBLE_COLORED_LIGHT_SPOTLIGHT =
             BLOCKS.register("invisible_colored_light_spotlight",
                     () -> new InvisibleColoredLightSpotlightBlock(
@@ -120,6 +133,7 @@ public final class ColoredLightCompatRegistry {
                             COLORED_LIGHT_PANEL.get(),
                             COLORED_LIGHT_SPOTLIGHT.get(),
                             COLORED_LIGHT_SPOTLIGHT_BIG.get(),
+                            HANGING_LAMP.get(),
                             INVISIBLE_COLORED_LIGHT_SPOTLIGHT.get(),
                             INVISIBLE_COLORED_POINTLIGHT.get()
                     ).build(null));

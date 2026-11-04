@@ -1,8 +1,10 @@
 package com.lights.yesmenn.network;
 
 import com.lights.yesmenn.block.entity.ColoredLightBlockEntity;
+import com.lights.yesmenn.item.ColorfulFlashlightItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -12,9 +14,14 @@ public final class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
+        // Version 2: open-screen payload and flashlight settings carry flicker / glow / spill / fringe.
+        // Version 3: SET_CONFIG packs the radius in 7 bits (up to 128).
+        // Version 4: hanging lamp warm-up time (SET_WARMUP, open-screen payload).
+        // Version 5: hanging lamp warm-up color (SET_WARMUP_TINT, open-screen payload).
+        PayloadRegistrar registrar = event.registrar("5");
         registrar.playToServer(ColoredLightActionPayload.TYPE, ColoredLightActionPayload.STREAM_CODEC, ModNetworking::handleColoredLightAction);
         registrar.playToServer(ColoredLightSpotlightPayload.TYPE, ColoredLightSpotlightPayload.STREAM_CODEC, ModNetworking::handleColoredLightSpotlight);
+        registrar.playToServer(FlashlightConfigPayload.TYPE, FlashlightConfigPayload.STREAM_CODEC, ModNetworking::handleFlashlightConfig);
         registrar.playToClient(OpenColoredLightScreenPayload.TYPE, OpenColoredLightScreenPayload.STREAM_CODEC, ModNetworking::handleOpenColoredLightScreen);
     }
 
@@ -37,6 +44,14 @@ public final class ModNetworking {
                     ColoredLightActionPayload.unpackRedstoneInverted(payload.value()));
         } else if (payload.action() == ColoredLightActionPayload.SET_BRIGHTNESS) {
             light.setBrightness(payload.value());
+        } else if (payload.action() == ColoredLightActionPayload.SET_FLICKER) {
+            light.setFlicker(payload.value());
+        } else if (payload.action() == ColoredLightActionPayload.SET_WARMUP_TINT) {
+            light.setWarmupTint(payload.value());
+        } else if (payload.action() == ColoredLightActionPayload.SET_WARMUP) {
+            light.setWarmup(payload.value());
+        } else if (payload.action() == ColoredLightActionPayload.SET_GLOW) {
+            light.setGlow(payload.value());
         } else if (payload.action() == ColoredLightActionPayload.SET_SPOTLIGHT_CONFIG) {
             light.setSpotlightConfig(
                     ColoredLightActionPayload.unpackSpotlightAngle(payload.value()),
@@ -62,6 +77,17 @@ public final class ModNetworking {
                 payload.size(),
                 payload.softness(),
                 payload.focus());
+    }
+
+    private static void handleFlashlightConfig(FlashlightConfigPayload payload,
+                                               net.neoforged.neoforge.network.handling.IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) {
+            return;
+        }
+        ItemStack stack = player.getItemInHand(payload.hand());
+        if (stack.getItem() instanceof ColorfulFlashlightItem) {
+            payload.settings().write(stack);
+        }
     }
 
     private static boolean canEdit(ServerPlayer player, BlockPos pos) {

@@ -92,17 +92,22 @@ public final class ColoredLightsConfigScreen extends Screen {
                 () -> VilcConfigBridge.getInt(vilcConfig, "areaLightLimit"),
                 value -> VilcConfigBridge.setInt(vilcConfig, "areaLightLimit", (int) Math.round(value)),
                 true));
-        addRenderableWidget(Button.builder(
-                        toggleLabel("Detailed normals", VilcConfigBridge.getBoolean(vilcConfig, "detailedNormals")),
-                        button -> {
-                            VilcConfigBridge.setBoolean(
-                                    vilcConfig,
-                                    "detailedNormals",
-                                    !VilcConfigBridge.getBoolean(vilcConfig, "detailedNormals"));
-                            rebuildConfigWidgets();
-                        })
-                .bounds(left, top + 78, COLUMN_WIDTH, 20)
-                .build());
+        int rowY = top + 78;
+        // Only VILC before 1.6.0 has the "detailed normals" option.
+        if (VilcConfigBridge.hasField(vilcConfig, "detailedNormals")) {
+            addRenderableWidget(Button.builder(
+                            toggleLabel("Detailed normals", VilcConfigBridge.getBoolean(vilcConfig, "detailedNormals")),
+                            button -> {
+                                VilcConfigBridge.setBoolean(
+                                        vilcConfig,
+                                        "detailedNormals",
+                                        !VilcConfigBridge.getBoolean(vilcConfig, "detailedNormals"));
+                                rebuildConfigWidgets();
+                            })
+                    .bounds(left, rowY, COLUMN_WIDTH, 20)
+                    .build());
+            rowY += 26;
+        }
         addRenderableWidget(Button.builder(
                         toggleLabel("Voxel shadows", VilcConfigBridge.getBoolean(vilcConfig, "voxelShadows")),
                         button -> {
@@ -112,8 +117,43 @@ public final class ColoredLightsConfigScreen extends Screen {
                                     !VilcConfigBridge.getBoolean(vilcConfig, "voxelShadows"));
                             rebuildConfigWidgets();
                         })
-                .bounds(left, top + 104, COLUMN_WIDTH, 20)
+                .bounds(left, rowY, COLUMN_WIDTH, 20)
                 .build());
+        rowY += 26;
+
+        // Light beams (VILC 1.6.0+): on/off toggle plus quality (1-3); not part of the quality presets.
+        if (VilcConfigBridge.hasField(vilcConfig, "volumetricBeams")) {
+            boolean beams = VilcConfigBridge.getBoolean(vilcConfig, "volumetricBeams");
+            addRenderableWidget(Button.builder(
+                            toggleLabel("Light beams", beams),
+                            button -> {
+                                VilcConfigBridge.setField(vilcConfig, "volumetricBeams", !beams);
+                                rebuildConfigWidgets();
+                            })
+                    .bounds(left, rowY, COLUMN_WIDTH, 20)
+                    .build());
+            rowY += 26;
+            int beamQuality = VilcConfigBridge.getInt(vilcConfig, "volumetricQuality");
+            Button qualityButton = Button.builder(
+                            Component.literal("Light beam quality: " + beamQualityLabel(beamQuality)),
+                            button -> {
+                                VilcConfigBridge.setField(vilcConfig, "volumetricQuality",
+                                        beamQuality >= 3 ? 1 : Math.max(1, beamQuality + 1));
+                                rebuildConfigWidgets();
+                            })
+                    .bounds(left, rowY, COLUMN_WIDTH, 20)
+                    .build();
+            qualityButton.active = beams;
+            addRenderableWidget(qualityButton);
+        }
+    }
+
+    private static String beamQualityLabel(int quality) {
+        return switch (quality) {
+            case 1 -> "Low";
+            case 3 -> "High";
+            default -> "Medium";
+        };
     }
 
     private void addLightsYesMennColorColumn(int left, int top) {

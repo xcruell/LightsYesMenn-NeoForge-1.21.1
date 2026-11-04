@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "lightsyesmenn:item/colorful_flashlight",
+    "layer1": "lightsyesmenn:item/colorful_flashlight_lens"
+  }
+}
